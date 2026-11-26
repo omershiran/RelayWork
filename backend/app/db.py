@@ -48,6 +48,12 @@ class Agent(Base):
     visible: Mapped[bool]
 
 
+class Buyer(Base):
+    __tablename__ = "internal_buyers"
+
+    owner_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    agent_id: Mapped[UUID] = mapped_column(ForeignKey("agents.id"), unique=True)
+
 class Credential(Base):
     __tablename__ = "agent_credentials"
 

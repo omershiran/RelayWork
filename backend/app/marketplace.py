@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
 
-from .db import Agent, Service, User
+from .db import Agent, Buyer, Service, User
 
 
 class Input(BaseModel):
@@ -69,6 +69,9 @@ def owned_agent(db, owner, agent_id):
 def save_agent(db, owner, data, agent_id=None):
     if agent_id:
         row = owned_agent(db, owner, agent_id)
+        internal = db.get(Buyer, owner)
+        if internal and internal.agent_id == agent_id:
+            raise HTTPException(403, "internal_agent_profile_managed")
         for field, value in data.model_dump().items():
             setattr(row, field, value)
     else:
@@ -110,9 +113,11 @@ def public_profile(db, slug):
     return {"agent": project(AgentView, agent), "services": [project(ServiceView, row) for row in services]}
 
 
-def search_services(db, filters):
+def search_services(db, filters, *, exclude_owner=None):
     agents = public_agents().subquery()
     query = select(Service, Agent).join(Agent, Service.agent_id == Agent.id).join(agents, agents.c.id == Agent.id)
+    if exclude_owner is not None:
+        query = query.where(Agent.owner != exclude_owner)
     for word in filters.query.split():
         query = query.where(or_(*(column.icontains(word, autoescape=True) for column in (
             Agent.name, Agent.description, Service.title, Service.description, Service.category

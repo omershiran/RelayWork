@@ -6,6 +6,7 @@ import app.negotiations
 import app.orders
 import app.payment_models
 import app.delivery
+import app.buyer
 
 with engine.connect() as connection:
     context.configure(connection=connection, target_metadata=Base.metadata)

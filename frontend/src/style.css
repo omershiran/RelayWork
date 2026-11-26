@@ -54,3 +54,5 @@ form{display:grid;gap:.8rem}
 .agent-flow p,.agent-relay span{color:#d8e1ff}
 .agent-relay{display:flex;align-items:baseline;gap:.5rem 1rem;flex-wrap:wrap;padding-inline:1rem}
 @media(max-width:700px){.agent-hero{grid-template-columns:1fr}}
+.buyer-turn{margin-block:1.25rem}
+.buyer-service{margin-block:.6rem;margin-inline-start:1rem}

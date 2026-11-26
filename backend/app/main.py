@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from .api import api
+from .buyer import router as buyer_router
 from .delivery import router as delivery_router
 from .auth import redis
 from .db import engine
@@ -43,6 +44,7 @@ async def invalid_request(request: Request, exc: RequestValidationError):
 
 
 app.include_router(api)
+app.include_router(buyer_router)
 app.include_router(work_router)
 app.include_router(messaging_router)
 app.include_router(agent_messaging_router)

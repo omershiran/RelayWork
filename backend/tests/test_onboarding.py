@@ -340,3 +340,44 @@ def test_scoped_agent_to_agent_contact_and_reply(server):
         assert order["terms"]["price_cents"] == 3200
         assert order["terms"]["author_agent_id"] == seller_agent["id"]
         assert order["payment_status"] == "UNCONFIGURED"
+
+
+def test_one_click_internal_buyer_chat_and_supplier_contact(server):
+    with client(server) as buyer, client(server) as supplier:
+        signup(buyer, server)
+        signup(supplier, server)
+        agent = buyer.post("/buyer").raise_for_status().json()
+        assert buyer.post("/buyer").raise_for_status().json()["id"] == agent["id"]
+        assert agent["role"] == "buyer" and not agent["visible"]
+        assert buyer.get("/me/agents").raise_for_status().json() == []
+        assert buyer.post("/me/credentials", json={"agent_id":agent["id"], "scope":"messaging"}).status_code == 403
+        path = "/buyer/" + agent["id"] + "/chat"
+        assert supplier.get(path).status_code == 404
+        assert buyer.post(path, headers={"Origin":"https://unrelated.example"}, json={}).status_code == 403
+        arithmetic = {"client_id":str(uuid4()), "prompt":"Calculate 8 × 7"}
+        answer = buyer.post(path, json=arithmetic).raise_for_status().json()
+        assert answer["response"] == "56" and answer["kind"] == "answer"
+        assert buyer.post(path, json=arithmetic).raise_for_status().json()["id"] == answer["id"]
+        assert buyer.post(path, json={**arithmetic, "prompt":"1+1"}).status_code == 409
+        business = supplier.post("/agents", json={
+            "name":"TimbrelTech", "description":"Specialized service provider", "role":"supplier",
+        }).raise_for_status().json()
+        service = supplier.post("/agents/" + business["id"] + "/services", json={
+            "title":"TimbrelTech printing", "category":"printing", "description":"Printing for small booklets",
+            "delivery_days":3, "language":"en",
+        }).raise_for_status().json()
+        search = {"client_id":str(uuid4()), "prompt":"Find me TimbrelTech"}
+        found = buyer.post(path, json=search).raise_for_status().json()
+        assert found["kind"] == "services"
+        assert found["recommendations"][0]["service"]["id"] == service["id"]
+        assert supplier.get("/conversations").raise_for_status().json() == []
+        contact = path + "/" + found["id"] + "/contact"
+        details = {"client_id":str(uuid4()), "service_id":service["id"], "brief":"Can you print 20 booklets?"}
+        assert buyer.post(contact, json={**details, "service_id":str(uuid4())}).status_code == 404
+        thread = buyer.post(contact, json=details).raise_for_status().json()
+        assert thread["initiator_agent_id"] == agent["id"]
+        assert thread["recipient_agent_id"] == business["id"]
+        assert buyer.post(contact, json=details).raise_for_status().json()["id"] == thread["id"]
+        assert len(buyer.get(path).raise_for_status().json()) == 2
+        inbox = supplier.get("/conversations/" + thread["id"] + "/messages").raise_for_status().json()
+        assert inbox[0]["body"] == details["brief"] and inbox[0]["sender_type"] == "agent"

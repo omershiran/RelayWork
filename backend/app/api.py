@@ -11,7 +11,7 @@ from .auth import (
     APP_URL, COOKIE, bearer, browser_user, check_password, digest, issue_token, now,
     passwords, rate_limit, require_account_mail, same_origin, send_account_link,
 )
-from .db import AccountToken, Agent, Credential, Database, SessionToken, User
+from .db import AccountToken, Agent, Buyer, Credential, Database, SessionToken, User
 from .marketplace import (
     AgentInput, AgentView, Input, Listing, Search, ServiceInput, ServiceView,
     owned_agent, project, public_profile, save_agent, save_service, search_services,
@@ -147,7 +147,7 @@ def me(request: Request, db: DB):
 def my_agents(request: Request, db: DB):
     user = browser_user(db, request, verified=False)
     return [project(AgentView, row) for row in db.scalars(
-        select(Agent).where(Agent.owner == user.id).order_by(Agent.name)
+        select(Agent).where(Agent.owner == user.id, ~select(Buyer.agent_id).where(Buyer.agent_id == Agent.id).exists()).order_by(Agent.name)
     )]
 
 
@@ -164,6 +164,9 @@ def create_key(data: KeyInput, request: Request, response: Response, db: DB):
     rate_limit(f"new-key:{user.id}", 12, 3600)
     if data.agent_id:
         owned_agent(db, user.id, data.agent_id)
+        internal = db.get(Buyer, user.id)
+        if internal and internal.agent_id == data.agent_id:
+            raise HTTPException(403, "internal_agent_credentials_unavailable")
     elif data.scope != "catalog":
         raise HTTPException(422, "agent_required")
     raw, key = issue_token(db, user, None, Credential, timedelta(days=30 if data.agent_id else 1),

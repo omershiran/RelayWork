@@ -8,6 +8,7 @@ import {WorkRequests} from "./work";
 import {workLabels} from "./work-labels";
 import {Contact, Conversations, ThreadRoute, messagingLabels} from "./messaging";
 import {quoteLabels} from "./quotes";
+import {BuyerChatRoute, BuyerLaunch} from "./buyer";
 import {CheckoutPreview} from "./checkout-preview";
 
 function ServiceCard({agent, service, t, lang, user}) {
@@ -31,7 +32,7 @@ function Marketplace({t, lang, user}) {
     <section className="hero"><div className="wrap">
       <div className="agent-hero">
         <div><p className="eyebrow">{t.eyebrow}</p><h1>{t.hero}</h1><p>{t.intro}</p>
-          <div className="actions"><Link className="button" to="/connect">{t.connect}</Link>
+          <div className="actions"><BuyerLaunch {...{t, lang, user}}/><Link className="hero-link" to="/connect">{t.connect}</Link>
           <a className="hero-link" href="#marketplace">{t.browseHuman}</a></div>
         </div>
         <div className="agent-flow" aria-label={t.agentFlow}>
@@ -177,7 +178,7 @@ function ServiceEditor({t, agentId}) {
   </form>;
 }
 
-function Account({t, user, setUser}) {
+function Account({t, lang, user, setUser}) {
   const [agents, setAgents] = useState([]);
   const [keys, setKeys] = useState([]);
   const [secret, setSecret] = useState("");
@@ -206,6 +207,7 @@ function Account({t, user, setUser}) {
     })}>{t.logout}</button></div>
     {action.status}
     {user.verified ? <>
+      <div className="card actions"><BuyerLaunch {...{t, lang, user}}/></div>
       <h2>{t.keys}</h2><button disabled={action.busy} onClick={() => createKey()}>{t.registerKey}</button>
       {secret && <div className="note"><p>{t.privateKey}</p><code dir="ltr">{secret}</code></div>}
       <ul className="keys">{keys.map(key => <li key={key.id}><bdi>{key.scope} · {new Date(key.expires).toLocaleString()}</bdi>{" "}
@@ -249,7 +251,8 @@ function App() {
       <Route path="/messages/:threadId" element={<ThreadRoute t={t} lang={lang} user={user}/>}/>
       <Route path="/connect" element={<Connect t={t}/>}/>
       <Route path="/checkout-preview" element={<CheckoutPreview lang={lang}/>}/>
-      <Route path="/account" element={<Account t={t} user={user} setUser={setUser}/>}/>
+      <Route path="/buyer/:agentId" element={<BuyerChatRoute {...{t, lang, user}}/>}/>
+      <Route path="/account" element={<Account t={t} lang={lang} user={user} setUser={setUser}/>}/>
       <Route path="/account-action" element={<AccountAction t={t}/>}/>
     </Routes></main>
     <div className="wrap bottom"><span>agentrelai · {import.meta.env.VITE_DEPLOYMENT === "public" ? t.preview : import.meta.env.VITE_DEPLOYMENT === "sandbox" ? t.sandbox : t.development}</span><a href="/api/docs">{t.api}</a></div>

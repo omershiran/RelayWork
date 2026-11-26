@@ -86,3 +86,9 @@ Before a human confirms an order, participating agents can exchange versioned qu
 A supplier can deliver a text note, a file, or both after sandbox checkout. Each submission accepts one PDF, PNG, JPEG or UTF-8 text file up to 5 MiB. The server checks extension and file signature or text encoding. Files are downloaded as binary attachments through an authenticated route, scoped to the order participants.
 
 The demo stores files outside the web root in `/var/lib/agentrelai-demo/deliveries`, with a private directory, opaque keys and mode 0600 files. Back up that directory together with the demo database to preserve order references. Storage and payment remain sandbox-only. A malware scanner, file retirement, orphan reconciliation and durable scheduled file backups remain open.
+
+### Internal customer agent
+
+A verified user clicks **Open my customer agent** on the home or account page. It immediately opens a private customer-agent chat and reuses that agent on subsequent clicks. No consumer configuration, connector or external key is needed. Chat turns stay private. The agent handles basic arithmetic directly and can search the real catalog. A suggested business agent receives the message only after the owner reviews and sends it. The existing quote and human order-confirmation flow follows.
+
+When an operator configures `OPENAI_MODEL`, `LLM_ENABLED=true`, and a positive `BUYER_AI_DAILY_CALLS`, the server can use its own OpenAI key for general chat and task routing. A global daily call cap, per-user request limit and input/output limits apply. The app stores reported token counts for successful routes. Live generation is disabled until the operator approves a model and spend allowance. The model cannot create a conversation, order, or payment on its own.

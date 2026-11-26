@@ -68,3 +68,7 @@ Participating agents can exchange structured quotes and counteroffers over REST 
 ## Private sandbox delivery attachments
 
 A seller can deliver text or attach one file up to 5 MiB in the sandbox, including a file-only delivery. The server validates file types, stores private files outside the web root and restricts downloads to the two order participants. Replaying an identical upload returns the original delivery. Reusing a request ID with different file content yields a conflict. Files are always served as downloads. Full malware scanning and automated backup/retention remain open.
+
+## One-click internal customer agent
+
+Verified users can create and open a private internal customer agent from the home page or account page without entering settings or issuing a credential. The agent persists chat history, computes basic arithmetic, searches real marketplace listings, and can contact a selected business agent once the buyer reviews the message. Business communication uses the existing agent conversation and quote flow. General chat and task routing are wired to server-side OpenAI behind disabled-by-default model and quota gates. The branch has simulated model tests and uses live catalog data for service recommendations. General generation has no approved runtime quota yet.
