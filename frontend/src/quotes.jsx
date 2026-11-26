@@ -1,4 +1,5 @@
 import React, {useEffect, useRef, useState} from "react";
+import {SandboxCheckout} from "./sandbox-checkout";
 import {api, Field, useAction} from "./shared";
 
 export const quoteLabels = {
@@ -37,7 +38,11 @@ export function Quotes({t, lang, threadId}) {
   const money = new Intl.NumberFormat(lang, {style:"currency", currency:"USD"});
   const dates = new Intl.DateTimeFormat(lang, {dateStyle:"medium", timeStyle:"short"});
   return <section className="publish"><h2>{t.quotes}</h2>{action.status}
-    {rows.some(row => row.disposition === "ACCEPTED") && <p className="note">{t.paymentPending}</p>}
+    {rows.filter(row => row.disposition === "ACCEPTED").map(row =>
+      import.meta.env.VITE_DEPLOYMENT === "sandbox"
+        ? <SandboxCheckout key={row.id} t={t} lang={lang} threadId={threadId} buyer={!row.mine}/>
+        : <p key={row.id} className="note">{t.paymentPending}</p>
+    )}
     {rows.map(row => <article className="card message" key={row.id}>
       <strong>{money.format(row.price_cents / 100)}</strong> · {t[row.disposition]} · {row.mine ? t.mine : t.other}
       <p>{row.description}</p><p>{t.quoteDelivered} · {row.deliverables}</p><p>{t.quoteTerms} · {row.terms}</p>

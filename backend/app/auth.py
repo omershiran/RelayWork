@@ -88,6 +88,13 @@ def bearer(db, authorization, scope=None, agent_id: UUID | None = None):
     return key
 
 
+def require_account_mail():
+    provider = os.getenv("SENDGRID_API_KEY") and os.getenv("EMAIL_FROM")
+    local = os.getenv("APP_ENV", "development") in {"development", "test", "demo"} and os.getenv("DEV_MAIL_DIR")
+    if not provider and not local:
+        raise HTTPException(503, "email_unavailable")
+
+
 def send_account_link(email, token, purpose):
     link = f"{APP_URL}/account-action#{purpose}:{token}"
     key = os.getenv("SENDGRID_API_KEY")
@@ -109,7 +116,7 @@ def send_account_link(email, token, purpose):
             response.raise_for_status()
         except httpx.HTTPError as exc:
             raise HTTPException(503, "email_unavailable") from exc
-    elif spool and os.getenv("APP_ENV", "development") in {"development", "test"}:
+    elif spool and os.getenv("APP_ENV", "development") in {"development", "test", "demo"}:
         path = Path(spool) / f"{secrets.token_hex(16)}.mail"
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w") as message:

@@ -44,3 +44,23 @@ Run `deployment/scripts/verify-restore.sh` for a real development database dump 
 For troubleshooting, inspect `sudo journalctl -u agentrelai-dev -n 60`, `sudo nginx -t`, and the health endpoint. Verify PostgreSQL and Redis are up if health returns 503. Keep account tokens, passwords and authorization headers out of diagnostic output.
 
 See [architecture](docs/architecture.md), [data model](docs/data-model.md), [plan](docs/plan.md), [development status](DEVELOPMENT_STATUS.md) and [owner actions](USER_ACTION_REQUIRED.md).
+
+## Public preview and isolated payment sandbox
+
+The public preview is available at `https://agentrelai.com`. Nginx terminates TLS. Production runs under the `agentrelai` OS role with the `agentrelai_prod` PostgreSQL database. Its Redis keys use database 2. The demo runs under `agentrelai_demo`, with a separate PostgreSQL database, Redis database 3 and a private mail spool. Redis database indexes provide logical separation within the local Redis instance.
+
+Build and deploy each target in order. Demo shares the production installation's root-owned application files and dependencies.
+
+```sh
+VITE_DEPLOYMENT=public deployment/scripts/build-frontend.sh
+deployment/scripts/deploy-prod.sh
+VITE_DEPLOYMENT=sandbox deployment/scripts/build-frontend.sh
+deployment/scripts/deploy-demo.sh
+deployment/scripts/build-frontend.sh
+deployment/scripts/deploy-dev.sh
+.venv/bin/python deployment/scripts/verify-demo.py
+```
+
+The demo is reachable only on `http://127.0.0.1:8093` and uses an explicitly labelled, locally hosted Sandbox form. It signs and verifies synthetic events and writes a balanced sandbox ledger. No card details are collected. The processor adapter and commercial transactions await an external payment provider. Public account signup requires a configured SendGrid sender and key in `/etc/agentrelai/prod.env`.
+
+The HTTP vhost serves ACME challenges and redirects other requests to HTTPS. Ubuntu's Certbot timer renews the certificate and the deploy hook reloads Nginx.

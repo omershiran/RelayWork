@@ -1,0 +1,23 @@
+[Unit]
+Description=agentrelai production API
+After=postgresql.service redis-server.service
+Requires=postgresql.service redis-server.service
+
+[Service]
+User=agentrelai
+WorkingDirectory=/opt/agentrelai-prod/backend
+Environment=APP_ENV=production
+Environment=APP_URL=https://agentrelai.com
+Environment=DATABASE_URL=postgresql+psycopg:///agentrelai_prod
+Environment=REDIS_URL=redis://127.0.0.1:6379/2
+EnvironmentFile=-/etc/agentrelai/prod.env
+ExecStart=/opt/agentrelai-prod/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8092 --no-access-log
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

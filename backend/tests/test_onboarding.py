@@ -1,6 +1,8 @@
 import asyncio
 import os
 import subprocess
+import socket
+from collections import namedtuple
 import sys
 import time
 from pathlib import Path
@@ -11,43 +13,48 @@ import pytest
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
-BASE = "http://127.0.0.1:8191"
+LocalServer = namedtuple("LocalServer", ["origin", "mail"])
 PASSWORD = " local integration password "
 
 
 @pytest.fixture
 def server(tmp_path_factory):
     mail = tmp_path_factory.mktemp("private-mail")
-    env = dict(os.environ, APP_ENV="test", APP_URL=BASE, DEV_MAIL_DIR=str(mail),
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    origin = f"http://127.0.0.1:{listener.getsockname()[1]}"
+    env = dict(os.environ, APP_ENV="test", APP_URL=origin, DEV_MAIL_DIR=str(mail),
                SENDGRID_API_KEY="", DATABASE_URL="postgresql+psycopg:///agentrelai_test",
                REDIS_URL="redis://127.0.0.1:6379/14", TEST_RATE_NAMESPACE=uuid4().hex)
-    process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8191", "--no-access-log"],
-        env=env,
-    )
+    with listener:
+        process = subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "app.main:app", "--fd", str(listener.fileno()), "--no-access-log"],
+            env=env,
+            pass_fds=(listener.fileno(),),
+        )
     try:
         for _ in range(80):
             if process.poll() is not None:
                 pytest.fail("Test API exited")
             try:
-                if httpx.get(f"{BASE}/api/health", timeout=1).is_success:
+                if httpx.get(f"{origin}/api/health", timeout=1).is_success:
                     break
             except httpx.TransportError:
                 pass
             time.sleep(0.1)
         else:
             pytest.fail("Test API did not become healthy")
-        yield mail
+        yield LocalServer(origin, mail)
     finally:
         process.terminate()
         process.wait(timeout=10)
 
 
-def signup(client, mail):
+def signup(client, server):
     email = f"{uuid4().hex}@example.com"
     data = {"email": email, "password": PASSWORD}
     assert client.post("/auth/register", json=data).status_code == 202
-    token = account_token(mail, email, "verify")
+    token = account_token(server.mail, email, "verify")
     assert client.post("/auth/login", json=data).json()["verified"] is False
     assert client.post("/me/credentials", json={}).status_code == 403
     assert client.post("/auth/verify", json={"token": token, "password": "incorrect password"}).status_code == 400
@@ -66,13 +73,13 @@ def account_token(mail: Path, email, purpose):
     pytest.fail(f"No {purpose} email")
 
 
-def client():
-    return httpx.Client(base_url=BASE + "/api/v1", headers={"Origin": BASE})
+def client(server):
+    return httpx.Client(base_url=server.origin + "/api/v1", headers={"Origin": server.origin})
 
 
-async def call_tool(token, name, arguments):
+async def call_tool(server, token, name, arguments):
     async with httpx.AsyncClient(headers={"Authorization": f"Bearer {token}"}) as http:
-        async with streamable_http_client(BASE + "/mcp/", http_client=http) as (read, write, _):
+        async with streamable_http_client(server.origin + "/mcp/", http_client=http) as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 tools = await session.list_tools()
@@ -81,12 +88,12 @@ async def call_tool(token, name, arguments):
 
 
 def test_mcp_supplier_onboarding_and_revocation(server):
-    with client() as owner, client() as other:
+    with client(server) as owner, client(server) as other:
         signup(owner, server)
         signup(other, server)
         key = owner.post("/me/credentials", json={}).json()["token"]
         profile = {"name": f"Print {uuid4().hex}", "description": "Catalog printing supplier", "role": "supplier"}
-        result = asyncio.run(call_tool(key, "register_agent", {"profile": profile}))
+        result = asyncio.run(call_tool(server, key, "register_agent", {"profile": profile}))
         assert not result.isError, result
         agent = result.structuredContent
         assert other.post("/me/credentials", json={"agent_id": agent["id"]}).status_code == 404
@@ -95,12 +102,12 @@ def test_mcp_supplier_onboarding_and_revocation(server):
         service = {"title":"Catalog printing", "description":"Print a booklet", "category":"printing",
                    "delivery_days":3, "country":"US", "language":"en", "price_cents":1599}
         args = {"agent_id":agent["id"], "service":service}
-        assert asyncio.run(call_tool(key, "publish_service", args)).isError
-        published = asyncio.run(call_tool(credential["token"], "publish_service", args))
+        assert asyncio.run(call_tool(server, key, "publish_service", args)).isError
+        published = asyncio.run(call_tool(server, credential["token"], "publish_service", args))
         assert not published.isError, published
         assert other.get("/agents/" + agent["slug"]).json()["services"][0]["price_cents"] == 1599
         filters = {"query": profile["name"], "country":"US", "max_delivery_days":3, "max_price_cents":1599}
-        response = asyncio.run(call_tool(key, "search_services", {"filters":filters}))
+        response = asyncio.run(call_tool(server, key, "search_services", {"filters":filters}))
         assert not response.isError, response
         assert response.structuredContent["result"][0]["agent"]["id"] == agent["id"]
         assert other.get("/services", params={**filters, "max_delivery_days":2}).json() == []
@@ -109,16 +116,16 @@ def test_mcp_supplier_onboarding_and_revocation(server):
         assert other.get("/agents/" + agent["slug"]).status_code == 404
         assert other.get("/services", params=filters).json() == []
         assert owner.delete("/me/credentials/" + credential["id"]).status_code == 200
-        assert asyncio.run(call_tool(credential["token"], "publish_service", args)).isError
+        assert asyncio.run(call_tool(server, credential["token"], "publish_service", args)).isError
 
 
 def test_password_reset_and_origin(server):
-    with client() as owner:
+    with client(server) as owner:
         email = signup(owner, server)
         assert owner.post("/me/credentials", headers={"Origin": "https://outside.example"}, json={}).status_code == 403
         key = owner.post("/me/credentials", json={}).json()["token"]
         assert owner.post("/auth/reset", json={"email":email}).status_code == 202
-        token = account_token(server, email, "reset")
+        token = account_token(server.mail, email, "reset")
         new_password = "updated integration password"
         assert owner.post("/auth/set-password", json={"token":token,"password":new_password}).status_code == 200
         assert owner.get("/auth/me").status_code == 401
@@ -131,7 +138,7 @@ def test_password_reset_and_origin(server):
 def test_work_request_and_private_polling(server):
     from datetime import UTC, datetime, timedelta
 
-    with client() as buyer, client() as supplier, client() as stranger:
+    with client(server) as buyer, client(server) as supplier, client(server) as stranger:
         signup(buyer, server)
         signup(supplier, server)
         signup(stranger, server)
@@ -146,7 +153,7 @@ def test_work_request_and_private_polling(server):
         assert not {"owner", "email"}.intersection(work)
         assert work["min_price_cents"] is None and work["max_price_cents"] is None
         key = supplier.post("/me/credentials", json={}).json()["token"]
-        listed = asyncio.run(call_tool(key, "get_work_requests", {"category":"printing"}))
+        listed = asyncio.run(call_tool(server, key, "get_work_requests", {"category":"printing"}))
         assert not listed.isError, listed
         assert work["id"] in {row["id"] for row in listed.structuredContent["result"]}
         path = "/work-requests/" + work["id"] + "/close"
@@ -174,7 +181,7 @@ def test_work_request_and_private_polling(server):
 
 
 def test_validation_does_not_echo_secret_input(server):
-    with client() as browser:
+    with client(server) as browser:
         password = uuid4().hex * 8
         response = browser.post("/auth/register", json={"email":"invalid", "password":password})
         assert response.status_code == 422
@@ -184,7 +191,7 @@ def test_validation_does_not_echo_secret_input(server):
 def test_counter_and_human_order_snapshot(server):
     from datetime import UTC, datetime, timedelta
 
-    with client() as buyer, client() as supplier, client() as stranger:
+    with client(server) as buyer, client(server) as supplier, client(server) as stranger:
         signup(buyer, server)
         signup(supplier, server)
         signup(stranger, server)

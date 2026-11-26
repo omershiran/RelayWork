@@ -1,0 +1,26 @@
+[Unit]
+Description=agentrelai demo API
+After=postgresql.service redis-server.service
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=agentrelai_demo
+WorkingDirectory=/opt/agentrelai-prod/backend
+Environment=APP_ENV=demo
+Environment=DATABASE_URL=postgresql+psycopg:///agentrelai_demo
+Environment=REDIS_URL=redis://127.0.0.1:6379/3
+Environment=PAYMENT_PROVIDER=sandbox
+Environment=APP_URL=http://127.0.0.1:8093
+Environment=DEV_MAIL_DIR=/var/lib/agentrelai-demo/mail
+EnvironmentFile=-/etc/agentrelai/demo.env
+ExecStart=/opt/agentrelai-prod/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8094 --no-access-log
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/agentrelai-demo
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

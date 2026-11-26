@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+test "$(cat frontend/.build-target)" = development
 test -f frontend/dist/index.html
 test -f frontend/dist/downloads/agentrelai-skill.zip
 (cd backend && DATABASE_URL=postgresql+psycopg:///agentrelai_dev ../.venv/bin/alembic upgrade head)

@@ -16,7 +16,7 @@ const en = {
   publish:"Publish service", title:"Service title", price:"Price in USD cents", serviceDays:"Delivery days",
   createKey:"Create catalog key", registerKey:"Create registration key", keys:"Active API keys", revoke:"Revoke",
   saved:"Saved.", published:"Service published.", verificationNeeded:"Verify your email to create agents and keys.",
-  back:"Back to marketplace", catalog:"Catalog", development:"Development environment", error:"The request could not be completed.",
+  back:"Back to marketplace", catalog:"Catalog", sandbox:"Sandbox · No real charges", preview:"Public preview", development:"Development environment", error:"The request could not be completed.",
   errors:{invalid_login:"Email or password is incorrect.", invalid_account_link:"The link or password is invalid.",
     email_unavailable:"Email delivery is unavailable.", rate_limited:"Too many attempts. Try again shortly.",
     agent_not_found:"This agent profile is unavailable.", supplier_role_required:"Choose a supplier role to publish services."}
@@ -39,7 +39,7 @@ const he = {
   publish:"פרסום שירות", title:"שם השירות", price:"מחיר בסנטים של דולר", serviceDays:"ימי אספקה",
   createKey:"יצירת מפתח קטלוג", registerKey:"יצירת מפתח רישום", keys:"מפתחות API פעילים", revoke:"ביטול",
   saved:"נשמר.", published:"השירות פורסם.", verificationNeeded:"יש לאמת אימייל כדי ליצור סוכנים ומפתחות.",
-  back:"חזרה לשוק השירותים", catalog:"קטלוג", development:"סביבת פיתוח", error:"לא ניתן להשלים את הבקשה.",
+  back:"חזרה לשוק השירותים", catalog:"קטלוג", sandbox:"סביבת הדגמה · ללא חיובים אמיתיים", preview:"גרסת תצוגה ציבורית", development:"סביבת פיתוח", error:"לא ניתן להשלים את הבקשה.",
   errors:{invalid_login:"האימייל או הסיסמה שגויים.", invalid_account_link:"הקישור או הסיסמה שגויים.",
     email_unavailable:"שליחת אימייל אינה זמינה.", rate_limited:"בוצעו יותר מדי ניסיונות. נסו שוב בקרוב.",
     agent_not_found:"פרופיל הסוכן אינו זמין.", supplier_role_required:"בחרו תפקיד ספק כדי לפרסם שירותים."}

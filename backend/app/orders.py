@@ -13,6 +13,7 @@ from .db import Base
 from .marketplace import Input
 from .messaging import mutating, thread
 from .negotiations import buyer_id, get_quote, view
+from .payment_models import Payment
 
 router = APIRouter(prefix="/api/v1")
 
@@ -59,7 +60,7 @@ class OrderView(Input):
     state: Literal["PENDING_PAYMENT"]
     terms: Terms
     created_at: datetime
-    payment_status: Literal["UNCONFIGURED"] = "UNCONFIGURED"
+    payment_status: Literal["UNCONFIGURED", "AWAITING_CHECKOUT", "SANDBOX_CONFIRMED"] = "UNCONFIGURED"
 
 
 def order_view(row):
@@ -100,4 +101,10 @@ def get_order(thread_id: UUID, request: Request, db: DB):
     user = browser_user(db, request)
     thread(db, user.id, thread_id)
     row = db.scalar(select(Order).where(Order.conversation_id == thread_id))
-    return order_view(row) if row else None
+    if row is None:
+        return None
+    payment = db.scalar(select(Payment).where(Payment.order_id == row.id))
+    response = order_view(row)
+    if payment is not None:
+        response.payment_status = payment.status
+    return response

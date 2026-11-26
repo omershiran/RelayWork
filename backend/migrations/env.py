@@ -4,6 +4,7 @@ import app.work  # Registers commerce models for migration discovery.
 import app.messaging
 import app.negotiations
 import app.orders
+import app.payment_models
 
 with engine.connect() as connection:
     context.configure(connection=connection, target_metadata=Base.metadata)

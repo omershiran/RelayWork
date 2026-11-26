@@ -6,3 +6,4 @@ npm exec --yes --package=node@22 -- node frontend/node_modules/vite/bin/vite.js 
 frontend_dist="$(realpath frontend/dist)"
 mkdir -p "$frontend_dist/downloads"
 python3 -m zipfile -c "$frontend_dist/downloads/agentrelai-skill.zip" skills/agentrelai
+printf "%s\\n" "${VITE_DEPLOYMENT:-development}" > frontend/.build-target

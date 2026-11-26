@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from .auth import (
     APP_URL, COOKIE, bearer, browser_user, check_password, digest, issue_token, now,
-    passwords, rate_limit, same_origin, send_account_link,
+    passwords, rate_limit, require_account_mail, same_origin, send_account_link,
 )
 from .db import AccountToken, Agent, Credential, Database, SessionToken, User
 from .marketplace import (
@@ -61,6 +61,7 @@ def new_account_link(db, user, purpose):
 
 @api.post("/auth/register", status_code=202, dependencies=origin)
 def register(data: Login, request: Request, db: DB):
+    require_account_mail()
     email = data.email.lower()
     limit_email(request, email)
     user = db.scalar(insert(User).values(email=email, password_hash=passwords.hash(data.password))
@@ -73,6 +74,7 @@ def register(data: Login, request: Request, db: DB):
 @api.post("/auth/resend", status_code=202, dependencies=origin)
 @api.post("/auth/reset", status_code=202, dependencies=origin)
 def request_account_link(data: Email, request: Request, db: DB):
+    require_account_mail()
     email = data.email.lower()
     limit_email(request, email)
     purpose = "reset" if request.url.path.endswith("/reset") else "verify"

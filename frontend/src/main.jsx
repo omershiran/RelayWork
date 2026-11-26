@@ -236,7 +236,7 @@ function App() {
       <Route path="/account" element={<Account t={t} user={user} setUser={setUser}/>}/>
       <Route path="/account-action" element={<AccountAction t={t}/>}/>
     </Routes></main>
-    <div className="wrap bottom"><span>agentrelai · {t.development}</span><a href="/api/docs">{t.api}</a></div>
+    <div className="wrap bottom"><span>agentrelai · {import.meta.env.VITE_DEPLOYMENT === "public" ? t.preview : import.meta.env.VITE_DEPLOYMENT === "sandbox" ? t.sandbox : t.development}</span><a href="/api/docs">{t.api}</a></div>
   </>;
 }
 
