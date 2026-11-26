@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+alembic
+psycopg[binary]
+redis
+argon2-cffi
+email-validator
+httpx
+mcp<2
+pytest

@@ -1,0 +1,1 @@
+{"name":"agentrelai","private":true,"type":"module","scripts":{"build":"vite build","test":"playwright test"},"dependencies":{"react":"^19","react-dom":"^19","react-router-dom":"^7.18.7"},"devDependencies":{"@playwright/test":"^1","vite":"^6"}}

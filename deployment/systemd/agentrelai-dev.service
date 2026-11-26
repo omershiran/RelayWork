@@ -1,0 +1,23 @@
+[Unit]
+Description=agentrelai development API
+After=postgresql.service redis-server.service
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/agentrelai/backend
+Environment=APP_ENV=development
+Environment=APP_URL=http://127.0.0.1:8090
+Environment=DEV_MAIL_DIR=/var/lib/agentrelai-dev/mail
+EnvironmentFile=-/etc/agentrelai/dev.env
+ExecStart=/home/ubuntu/agentrelai/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8091 --no-access-log
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/agentrelai-dev
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
