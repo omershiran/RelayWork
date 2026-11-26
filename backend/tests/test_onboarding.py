@@ -287,3 +287,56 @@ def test_scoped_agent_to_agent_contact_and_reply(server):
         assert len(human) == 2
         assert seller.delete("/me/credentials/" + seller_key["id"]).status_code == 200
         assert seller.get(path, headers=seller_headers).status_code == 401
+
+        from datetime import UTC, datetime, timedelta
+
+        def negotiation_key(account, agent):
+            return account.post("/me/credentials", json={
+                "agent_id":agent["id"], "scope":"negotiation",
+            }).raise_for_status().json()
+
+        customer_quote_key = negotiation_key(buyer, buyer_agent)["token"]
+        business_quote_key = negotiation_key(seller, seller_agent)["token"]
+        sibling = seller.post("/agents", json={
+            "name":"Unrelated seller", "description":"Independent supplier fixture", "role":"supplier",
+        }).raise_for_status().json()
+        unrelated = negotiation_key(seller, sibling)["token"]
+        quote_path = base + "/" + thread["id"] + "/quotes"
+        assert seller.get(quote_path, headers={"Authorization":f"Bearer {unrelated}"}).status_code == 404
+        assert buyer.get(quote_path, headers={"Authorization":f"Bearer {buyer_key['token']}"}).status_code == 403
+        timestamp = datetime.now(UTC)
+        terms = {
+            "client_id":str(uuid4()), "price_cents":3400, "description":"Print booklets",
+            "deliverables":"10 bound copies", "terms":"One proof revision",
+            "due_at":(timestamp + timedelta(days=3)).isoformat(),
+            "expires_at":(timestamp + timedelta(days=1)).isoformat(),
+        }
+        args = {"thread_id":thread["id"], "quote":terms}
+        open_quote = asyncio.run(call_tool(server, business_quote_key, "send_quote", args))
+        assert not open_quote.isError, open_quote
+        proposal = open_quote.structuredContent
+        assert proposal["author_agent_id"] == seller_agent["id"]
+        replay = asyncio.run(call_tool(server, business_quote_key, "send_quote", args))
+        assert replay.structuredContent["id"] == proposal["id"]
+        counter = {**terms, "client_id":str(uuid4()), "price_cents":3000, "supersedes_id":proposal["id"]}
+        response = buyer.post(quote_path, json=counter, headers={"Authorization":f"Bearer {customer_quote_key}"})
+        assert response.status_code == 201, response.text
+        assert response.json()["author_agent_id"] == buyer_agent["id"]
+        final = {**terms, "client_id":str(uuid4()), "price_cents":3200, "supersedes_id":response.json()["id"]}
+        offered = asyncio.run(call_tool(server, business_quote_key, "send_quote", {"thread_id":thread["id"], "quote":final}))
+        assert not offered.isError, offered
+        accepted = offered.structuredContent
+        history = asyncio.run(call_tool(server, customer_quote_key, "get_quotes", {"thread_id":thread["id"]}))
+        assert [quote["disposition"] for quote in history.structuredContent["result"]] == ["COUNTERED", "COUNTERED", "OPEN"]
+        assert not any(quote["can_accept"] for quote in history.structuredContent["result"])
+        decision = {"thread_id":thread["id"], "quote_id":accepted["id"], "decision":"withdraw"}
+        assert asyncio.run(call_tool(server, customer_quote_key, "respond_to_quote", decision)).isError
+        assert asyncio.run(call_tool(server, business_quote_key, "respond_to_quote", {**decision, "decision":"reject"})).isError
+        human = "/conversations/" + thread["id"] + "/quotes/" + accepted["id"] + "/accept"
+        with httpx.Client(base_url=server.origin + "/api/v1", headers={"Origin":server.origin}) as agent:
+            assert agent.post(human, json={"confirmed_price_cents":3200},
+                              headers={"Authorization":f"Bearer {customer_quote_key}"}).status_code == 401
+        order = buyer.post(human, json={"confirmed_price_cents":3200}).raise_for_status().json()
+        assert order["terms"]["price_cents"] == 3200
+        assert order["terms"]["author_agent_id"] == seller_agent["id"]
+        assert order["payment_status"] == "UNCONFIGURED"

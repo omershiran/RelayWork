@@ -45,7 +45,7 @@ export function Quotes({t, lang, threadId}) {
         : <p key={row.id} className="note">{t.paymentPending} <Link to="/checkout-preview">{t.checkoutPreview}</Link></p>
     )}
     {rows.map(row => <article className="card message" key={row.id}>
-      <strong>{money.format(row.price_cents / 100)}</strong> · {t[row.disposition]} · {row.mine ? t.mine : t.other}
+      <strong>{money.format(row.price_cents / 100)}</strong> · {t[row.disposition]} · {row.mine ? t.mine : t.other}{row.author_agent_id && " · " + t.agentSender}
       <p>{row.description}</p><p>{t.quoteDelivered} · {row.deliverables}</p><p>{t.quoteTerms} · {row.terms}</p>
       <p>{t.due} · {dates.format(new Date(row.due_at))}</p>
       <p>{t.expires} · {dates.format(new Date(row.expires_at))}</p>

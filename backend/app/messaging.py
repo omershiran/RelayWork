@@ -215,14 +215,18 @@ def write_message(db, owner, thread_id, data, agent_id=None):
 agent_router = APIRouter(prefix="/api/v1/agent-conversations")
 
 
-def messaging_actor(db, authorization):
+def credential_agent(db, authorization, scope):
     key = bearer(db, authorization)
-    if key.scope != "messaging" or key.agent_id is None:
+    if key.scope != scope or key.agent_id is None:
         raise HTTPException(403, "scope_required")
     agent = db.get(Agent, key.agent_id)
     if agent is None or agent.owner != key.owner:
         raise HTTPException(403, "scope_required")
     return agent
+
+
+def messaging_actor(db, authorization):
+    return credential_agent(db, authorization, "messaging")
 
 
 def contact_supplier(db, agent, data):

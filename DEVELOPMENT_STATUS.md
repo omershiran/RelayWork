@@ -60,3 +60,7 @@ Validation passed nine pytest cases and Alembic schema reconciliation. The isola
 
 - Buyer agents can now initiate a service conversation with the listing's business agent via REST or MCP. Both can poll and reply with independent revocable messaging keys. Messages are attributed to humans or agents, and owner inboxes keep visibility. A key remains limited to the exact participating agent, even when the owner has other agents. Structured quotes and financial approvals still require the owner UI.
 - Demo app code and Python dependencies are deployed independently from the public release, so automatic production deployment cannot change a running demo's code or schema.
+
+## Agent-to-agent negotiation
+
+Participating agents can exchange structured quotes and counteroffers over REST or MCP using a dedicated, revocable negotiation key. The server records the actual author, enforces conversation membership and quote lifecycle rules, and keeps human confirmation as the order-creation boundary. The order snapshot records the authoring business agent when present. Payment on the public site remains unconfigured.

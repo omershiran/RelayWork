@@ -11,9 +11,10 @@ from .api import DB
 from .auth import browser_user, now, rate_limit
 from .db import Base
 from .marketplace import Input
-from .messaging import thread, mutating
+from .messaging import credential_agent, mutating, thread
 
 router = APIRouter(prefix="/api/v1/conversations/{thread_id}/quotes")
+agent_router = APIRouter(prefix="/api/v1/agent-conversations/{thread_id}/quotes")
 
 
 class Quote(Base):
@@ -27,6 +28,7 @@ class Quote(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     conversation_id: Mapped[UUID] = mapped_column(ForeignKey("conversations.id"), index=True)
     author: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    author_agent_id: Mapped[UUID | None] = mapped_column(ForeignKey("agents.id", name="quote_versions_author_agent_id_fkey"))
     client_id: Mapped[UUID]
     supersedes_id: Mapped[UUID | None] = mapped_column(ForeignKey("quote_versions.id"))
     price_cents: Mapped[int]
@@ -52,6 +54,7 @@ class QuoteInput(Input):
 
 class QuoteView(Input):
     id: UUID
+    author_agent_id: UUID | None
     supersedes_id: UUID | None
     price_cents: int
     currency: Literal["USD"] = "USD"
@@ -86,25 +89,31 @@ def buyer_id(conversation):
 
 @router.get("", response_model=list[QuoteView])
 def list_quotes(thread_id: UUID, request: Request, db: DB):
-    user = browser_user(db, request)
-    conversation = thread(db, user.id, thread_id)
+    return quote_history(db, browser_user(db, request).id, thread_id)
+
+
+def quote_history(db, owner, thread_id, agent_id=None):
+    conversation = thread(db, owner, thread_id, agent_id=agent_id)
     rows = db.scalars(select(Quote).where(Quote.conversation_id == conversation.id).order_by(Quote.created_at, Quote.id))
-    return [view(row, user.id, buyer_id(conversation)) for row in rows]
+    return [view(row, owner, buyer_id(conversation) if agent_id is None else None) for row in rows]
 
 
 @router.post("", response_model=QuoteView, status_code=201, dependencies=mutating)
 def make_quote(thread_id: UUID, data: QuoteInput, request: Request, db: DB):
-    user = browser_user(db, request)
-    rate_limit(f"quote:{user.id}", 30, 3600)
-    conversation = thread(db, user.id, thread_id, lock=True)
+    return submit_quote(db, browser_user(db, request).id, thread_id, data)
+
+
+def submit_quote(db, owner, thread_id, data, agent_id=None):
+    rate_limit(f"quote:{owner}", 30, 3600)
+    conversation = thread(db, owner, thread_id, lock=True, agent_id=agent_id)
     fields = data.model_dump()
     existing = db.scalar(select(Quote).where(
-        Quote.conversation_id == conversation.id, Quote.author == user.id, Quote.client_id == data.client_id
+        Quote.conversation_id == conversation.id, Quote.author == owner, Quote.client_id == data.client_id
     ))
     if existing:
-        if any(getattr(existing, key) != value for key, value in fields.items()):
+        if existing.author_agent_id != agent_id or any(getattr(existing, key) != value for key, value in fields.items()):
             raise HTTPException(409, "idempotency_conflict")
-        return view(existing, user.id)
+        return view(existing, owner)
     timestamp = now()
     if not timestamp < data.expires_at <= min(data.due_at, timestamp + timedelta(days=90)):
         raise HTTPException(422, "invalid_quote_expiration")
@@ -115,24 +124,29 @@ def make_quote(thread_id: UUID, data: QuoteInput, request: Request, db: DB):
         raise HTTPException(409, "quote_limit")
     current = next((row for row in seen if row.disposition == "OPEN" and row.expires_at > timestamp), None)
     if data.supersedes_id:
-        if current is None or current.id != data.supersedes_id or current.author == user.id:
+        if current is None or current.id != data.supersedes_id or current.author == owner:
             raise HTTPException(409, "invalid_counter_offer")
         current.disposition = "COUNTERED"
-    elif current is not None or user.id == buyer_id(conversation):
+    elif current is not None or owner == buyer_id(conversation):
         raise HTTPException(409, "supplier_or_counter_required")
-    quote = Quote(conversation_id=conversation.id, author=user.id, **fields)
+    quote = Quote(conversation_id=conversation.id, author=owner, author_agent_id=agent_id, **fields)
     conversation.updated_at = timestamp
     db.add(quote)
     db.commit()
-    return view(quote, user.id)
+    return view(quote, owner)
 
 
 @router.post("/{quote_id}/{decision}", response_model=QuoteView, dependencies=mutating)
 def end_quote(thread_id: UUID, quote_id: UUID, decision: Literal["reject", "withdraw"], request: Request, db: DB):
-    user = browser_user(db, request)
-    conversation = thread(db, user.id, thread_id, lock=True)
+    return decide_quote(db, browser_user(db, request).id, thread_id, quote_id, decision)
+
+
+def decide_quote(db, owner, thread_id, quote_id, decision, agent_id=None):
+    conversation = thread(db, owner, thread_id, lock=True, agent_id=agent_id)
     row = get_quote(db, conversation, quote_id)
-    if (row.author == user.id) != (decision == "withdraw"):
+    if (row.author == owner) != (decision == "withdraw") or (
+        agent_id is not None and decision == "withdraw" and row.author_agent_id != agent_id
+    ):
         raise HTTPException(403, "invalid_quote_actor")
     disposition = "WITHDRAWN" if decision == "withdraw" else "REJECTED"
     if row.disposition != disposition:
@@ -141,4 +155,22 @@ def end_quote(thread_id: UUID, quote_id: UUID, decision: Literal["reject", "with
         row.disposition = disposition
         conversation.updated_at = now()
         db.commit()
-    return view(row, user.id)
+    return view(row, owner)
+
+
+@agent_router.get("", response_model=list[QuoteView])
+def agent_list_quotes(thread_id: UUID, request: Request, db: DB):
+    agent = credential_agent(db, request.headers.get("authorization"), "negotiation")
+    return quote_history(db, agent.owner, thread_id, agent.id)
+
+
+@agent_router.post("", status_code=201, response_model=QuoteView)
+def agent_make_quote(thread_id: UUID, data: QuoteInput, request: Request, db: DB):
+    agent = credential_agent(db, request.headers.get("authorization"), "negotiation")
+    return submit_quote(db, agent.owner, thread_id, data, agent.id)
+
+
+@agent_router.post("/{quote_id}/{decision}", response_model=QuoteView)
+def agent_end_quote(thread_id: UUID, quote_id: UUID, decision: Literal["reject", "withdraw"], request: Request, db: DB):
+    agent = credential_agent(db, request.headers.get("authorization"), "negotiation")
+    return decide_quote(db, agent.owner, thread_id, quote_id, decision, agent.id)

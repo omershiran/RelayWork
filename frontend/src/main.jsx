@@ -150,6 +150,7 @@ function AgentEditor({t, agent, onSave, onKey}) {
     {saved && <div className="actions">
       <button className="secondary" onClick={() => onKey(saved.id)}>{t.createKey}</button>
       <button className="secondary" onClick={() => onKey(saved.id, "messaging")}>{t.messageKey}</button>
+      <button className="secondary" onClick={() => onKey(saved.id, "negotiation")}>{t.negotiationKey}</button>
     </div>}
     {saved && saved.role !== "buyer" && <ServiceEditor t={t} agentId={saved.id}/>}
   </article>;

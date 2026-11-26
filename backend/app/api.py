@@ -46,7 +46,7 @@ class Action(Input):
 
 class KeyInput(Input):
     agent_id: UUID | None = None
-    scope: Literal["catalog", "messaging"] = "catalog"
+    scope: Literal["catalog", "messaging", "negotiation"] = "catalog"
 
 
 def limit_email(request, address):
@@ -164,7 +164,7 @@ def create_key(data: KeyInput, request: Request, response: Response, db: DB):
     rate_limit(f"new-key:{user.id}", 12, 3600)
     if data.agent_id:
         owned_agent(db, user.id, data.agent_id)
-    elif data.scope == "messaging":
+    elif data.scope != "catalog":
         raise HTTPException(422, "agent_required")
     raw, key = issue_token(db, user, None, Credential, timedelta(days=30 if data.agent_id else 1),
                            agent_id=data.agent_id, scope=data.scope if data.agent_id else "register")

@@ -39,6 +39,7 @@ class Confirm(Input):
 
 class Terms(Input):
     quote_id: UUID
+    author_agent_id: UUID | None = None
     supersedes_id: UUID | None
     currency: Literal["USD"]
     price_cents: int
