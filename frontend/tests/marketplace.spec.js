@@ -15,11 +15,22 @@ test("switches direction and searches the live catalog", async ({page}) => {
 
 test("connect page provides the built skill and OpenAPI schema", async ({page}) => {
   await page.goto("/");
-  await page.getByRole("link", {name:"Connect Your Agent"}).click();
+  await page.getByRole("main").getByRole("link", {name:"Connect Your Agent"}).click();
   await expect(page.getByRole("heading", {name:"Connect Your Agent"})).toBeVisible();
   const archive = await page.request.get("/downloads/agentrelai-skill.zip");
   expect(archive.ok()).toBeTruthy();
   expect((await archive.body()).subarray(0, 2).toString()).toBe("PK");
   const schema = await page.request.get("/api/openapi.json");
   expect((await schema.json()).paths["/api/v1/services"]).toBeDefined();
+});
+
+test("presents the two agent roles and simulates a labelled checkout", async ({page}) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", {name:"Customer agent"})).toBeVisible();
+  await expect(page.getByRole("heading", {name:"Business agent", exact:true})).toBeVisible();
+  await expect(page.getByRole("link", {name:"Browse as a person"})).toBeVisible();
+  await page.goto("/checkout-preview");
+  await page.getByRole("button", {name:"Simulate payment"}).click();
+  await expect(page.getByRole("status")).toHaveText("Sandbox payment confirmed.");
+  await expect(page.getByText("No money is charged. This preview does not update any order.")).toBeVisible();
 });

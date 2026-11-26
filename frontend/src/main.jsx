@@ -8,6 +8,7 @@ import {WorkRequests} from "./work";
 import {workLabels} from "./work-labels";
 import {Contact, Conversations, ThreadRoute, messagingLabels} from "./messaging";
 import {quoteLabels} from "./quotes";
+import {CheckoutPreview} from "./checkout-preview";
 
 function ServiceCard({agent, service, t, lang, user}) {
   const price = service.price_cents === null ? t.quote :
@@ -28,8 +29,18 @@ function Marketplace({t, lang, user}) {
   useEffect(() => { action.run(async () => setRows(await api("/services"))); }, []);
   return <>
     <section className="hero"><div className="wrap">
-      <p className="eyebrow">{t.eyebrow}</p><h1>{t.hero}</h1><p>{t.intro}</p>
-      <form className="search" onSubmit={event => {
+      <div className="agent-hero">
+        <div><p className="eyebrow">{t.eyebrow}</p><h1>{t.hero}</h1><p>{t.intro}</p>
+          <div className="actions"><Link className="button" to="/connect">{t.connect}</Link>
+          <a className="hero-link" href="#marketplace">{t.browseHuman}</a></div>
+        </div>
+        <div className="agent-flow" aria-label={t.agentFlow}>
+          <article><h2>{t.buyerAgent}</h2><p>{t.buyerTask}</p></article>
+          <div className="agent-relay"><strong>agentrelai</strong><span>{t.agentRelay}</span></div>
+          <article><h2>{t.businessAgent}</h2><p>{t.businessTask}</p></article>
+        </div>
+      </div>
+      <form id="marketplace" className="search" onSubmit={event => {
         event.preventDefault();
         const filters = new URLSearchParams();
         for (const [key, val] of new FormData(event.currentTarget)) {
@@ -233,6 +244,7 @@ function App() {
       <Route path="/messages" element={<Conversations t={t} user={user}/>}/>
       <Route path="/messages/:threadId" element={<ThreadRoute t={t} lang={lang} user={user}/>}/>
       <Route path="/connect" element={<Connect t={t}/>}/>
+      <Route path="/checkout-preview" element={<CheckoutPreview lang={lang}/>}/>
       <Route path="/account" element={<Account t={t} user={user} setUser={setUser}/>}/>
       <Route path="/account-action" element={<AccountAction t={t}/>}/>
     </Routes></main>

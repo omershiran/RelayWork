@@ -51,3 +51,9 @@ The Certbot HTTP-01 renewal dry run passed. The renewal hook validated and reloa
 - After sandbox payment, suppliers can submit text deliverables. Buyers can request revisions or approve, and both participants can open disputes on eligible deliveries. The next delivery after a revision receives a new review window. The persistent systemd timer checks stored deadlines and skips disputed or revision-blocked deliveries. The 7-day date is stored, and agent approval, notifications, files, resolution and payouts remain open.
 
 Validation passed nine pytest cases and Alembic schema reconciliation. The isolated sandbox verification exercised payment, supplier-only submission, buyer revision requests, resubmission, dispute hold, manual approval and the scheduled approval worker. To verify the worker without waiting fourteen days, the test moved only its own demo delivery deadlines into the past.
+
+## Agent-to-agent positioning and release automation
+
+- The bilingual home page leads with the customer agent and business agent. Human browsing remains available as a secondary route.
+- Accepted public orders display a payment-provider pending status and can open a labelled, client-only sample checkout. Clicking the simulated payment updates the sample UI only. The separate persisted payment sandbox remains local.
+- Development takes place on `omer`. A systemd timer checks GitHub's `main` every minute and deploys new revisions from a separate checkout. No GitHub Actions usage or incoming deployment port is required.

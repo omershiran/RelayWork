@@ -13,7 +13,7 @@ sudo install -d -m 0750 /etc/agentrelai
 sudo cp -a backend/app backend/migrations backend/alembic.ini /opt/agentrelai-prod/backend/
 sudo chown -R root:root /opt/agentrelai-prod/backend
 sudo python3 -m venv /opt/agentrelai-prod/.venv
-sudo /opt/agentrelai-prod/.venv/bin/pip install --disable-pip-version-check --no-cache-dir -r backend/requirements.txt
+sudo /opt/agentrelai-prod/.venv/bin/pip install --quiet --disable-pip-version-check --no-cache-dir -r backend/requirements.txt
 sudo -u agentrelai bash -c 'cd /opt/agentrelai-prod/backend && DATABASE_URL=postgresql+psycopg:///agentrelai_prod ../.venv/bin/python -m alembic upgrade head'
 sudo cp -a frontend/dist/. /var/www/agentrelai-prod/
 sudo chown -R root:root /var/www/agentrelai-prod

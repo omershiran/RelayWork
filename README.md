@@ -68,3 +68,11 @@ The HTTP vhost serves ACME challenges and redirects other requests to HTTPS. Ubu
 After demo checkout, the supplier can submit a text deliverable. The buyer can request a revision or approve, and either participant can dispute an eligible delivery. Revisions and disputes stop automatic approval. The demo uses a persistent systemd timer to process elapsed 14-day deadlines. It records the 7-day review point for future agent authorization. Files, agent approvals, dispute decisions and settlement remain open.
 
 The OpenAI Responses adapter accepts a configured model and returns token counts. `LLM_ENABLED` defaults to false. There is no public generation route. A key by itself does not start paid generation.
+
+## Development branch and production releases
+
+Develop and test changes on `omer`. Push that branch for review and merge completed changes into `main`. The production server polls GitHub's `main` every minute using `agentrelai-main-deploy.timer`. It checks out the exact revision in `/home/ubuntu/agentrelai-deploy`, builds the frontend, upgrades the production database, restarts the API and verifies HTTPS health. The working checkout remains on `omer`.
+
+`deployment/scripts/install-main-deploy.sh` installs the timer on the existing EC2 host. It requires the local repo-scoped SSH configuration and the production deploy prerequisites. Use `journalctl -u agentrelai-main-deploy.service` for logs. The deployed revision is recorded in `~/.local/state/agentrelai/deployed-main` after health checks pass. A failed build or deployment leaves that marker unchanged so the next check retries. Grant write access to `main` only to release maintainers, since the server builds and deploys its contents.
+
+The public checkout preview simulates a sample order entirely in the browser. The local Sandbox separately exercises persisted mock payment records. Actual orders on the public site remain pending until a real payment provider is configured.

@@ -1,14 +1,15 @@
 import React, {useEffect, useRef, useState} from "react";
+import {Link} from "react-router-dom";
 import {SandboxCheckout} from "./sandbox-checkout";
 import {api, Field, useAction} from "./shared";
 
 export const quoteLabels = {
   en:{quotes:"Quotes", quoteForm:"Send quote", counter:"Counter offer", reject:"Reject",
-      withdraw:"Withdraw", accept:"Accept quote", confirm:"Confirm order at this price", paymentPending:"Order created. Checkout is unavailable in this environment.", ACCEPTED:"Accepted", quoteTerms:"Terms and revision policy", quoteDelivered:"Expected deliverables",
+      withdraw:"Withdraw", accept:"Accept quote", confirm:"Confirm order at this price", paymentPending:"Order created. Waiting for a payment provider.", checkoutPreview:"Try checkout preview", ACCEPTED:"Accepted", quoteTerms:"Terms and revision policy", quoteDelivered:"Expected deliverables",
       quotePrice:"Price (USD cents)", quoteSaved:"Quote sent.", quoteUpdated:"Quote updated.",
       OPEN:"Open", EXPIRED:"Expired", COUNTERED:"Countered", WITHDRAWN:"Withdrawn", REJECTED:"Rejected"},
   he:{quotes:"הצעות מחיר", quoteForm:"שליחת הצעת מחיר", counter:"הצעה נגדית", reject:"דחייה",
-      withdraw:"משיכה", accept:"קבלת הצעה", confirm:"אישור הזמנה במחיר זה", paymentPending:"ההזמנה נוצרה. תשלום עדיין אינו זמין בסביבה זו.", ACCEPTED:"התקבלה", quoteTerms:"תנאים ומדיניות תיקונים", quoteDelivered:"תוצרים צפויים",
+      withdraw:"משיכה", accept:"קבלת הצעה", confirm:"אישור הזמנה במחיר זה", paymentPending:"ההזמנה נוצרה וממתינה לחיבור ספק סליקה.", checkoutPreview:"ניסיון בתצוגת התשלום", ACCEPTED:"התקבלה", quoteTerms:"תנאים ומדיניות תיקונים", quoteDelivered:"תוצרים צפויים",
       quotePrice:"מחיר בסנטים של דולר", quoteSaved:"ההצעה נשלחה.", quoteUpdated:"ההצעה עודכנה.",
       OPEN:"פתוחה", EXPIRED:"פג תוקף", COUNTERED:"נענתה בהצעה נגדית", WITHDRAWN:"נמשכה", REJECTED:"נדחתה"}
 };
@@ -41,7 +42,7 @@ export function Quotes({t, lang, threadId}) {
     {rows.filter(row => row.disposition === "ACCEPTED").map(row =>
       import.meta.env.VITE_DEPLOYMENT === "sandbox"
         ? <SandboxCheckout key={row.id} t={t} lang={lang} threadId={threadId} buyer={!row.mine}/>
-        : <p key={row.id} className="note">{t.paymentPending}</p>
+        : <p key={row.id} className="note">{t.paymentPending} <Link to="/checkout-preview">{t.checkoutPreview}</Link></p>
     )}
     {rows.map(row => <article className="card message" key={row.id}>
       <strong>{money.format(row.price_cents / 100)}</strong> · {t[row.disposition]} · {row.mine ? t.mine : t.other}

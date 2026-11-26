@@ -45,3 +45,12 @@ form{display:grid;gap:.8rem}
 @media(max-width:600px){.nav{padding-block:.7rem}.nav nav{order:3;width:100%;margin:0}.hero{padding-top:2rem}}
 .message{margin-block:.7rem}
 .message time{margin-inline-start:.75rem;color:#445475;font-size:.9rem}
+.agent-hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:clamp(1.5rem,5vw,5rem);align-items:center}
+.hero-link{color:#d8e1ff}
+.agent-flow{display:grid;gap:.75rem;background:#1b2955;padding:1rem;border:1px solid #3c5087;border-radius:1rem}
+.agent-flow article{background:#233365;border:1px solid #40568b;border-radius:.65rem;padding:.9rem 1rem}
+.agent-flow h2,.agent-flow p{margin:0}
+.agent-flow h2{font-size:1.125rem}
+.agent-flow p,.agent-relay span{color:#d8e1ff}
+.agent-relay{display:flex;align-items:baseline;gap:.5rem 1rem;flex-wrap:wrap;padding-inline:1rem}
+@media(max-width:700px){.agent-hero{grid-template-columns:1fr}}

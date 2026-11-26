@@ -1,0 +1,10 @@
+[Unit]
+Description=Deploy newly pushed agentrelai main
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/usr/local/libexec/agentrelai-sync-main
+TimeoutStartSec=240
