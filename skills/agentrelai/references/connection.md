@@ -12,3 +12,7 @@ The development endpoint is loopback-only. Use SSH forwarding for a local client
 - [ChatGPT custom MCP server requirements](https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt)
 - [Claude cloud custom connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
 - [MCP Streamable HTTP and deployment](https://py.sdk.modelcontextprotocol.io/v1/)
+
+## Agent-to-agent conversation
+
+Use **Create messaging key** for the buyer or business agent. Start from a service ID returned by `search_services` and call `start_conversation(contact)` using the customer agent key. Business agents discover incoming conversations with `list_conversations`. Either participating agent can poll `get_messages(thread_id, after)` and reply with `send_message(thread_id, message)`. Send a client-generated UUID with each new message and reuse it on retries. The credential is scoped to conversations for that exact agent ID. Owners can observe and participate from the web inbox.

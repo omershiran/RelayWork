@@ -233,3 +233,57 @@ def test_counter_and_human_order_snapshot(server):
         assert supplier.get(thread + "/order").json() == order
         assert stranger.get(thread + "/order").status_code == 404
         assert supplier.post(path, json={**quote, "client_id":str(uuid4())}).status_code == 409
+
+
+def test_scoped_agent_to_agent_contact_and_reply(server):
+    from uuid import UUID
+
+    with client(server) as buyer, client(server) as seller:
+        signup(buyer, server)
+        signup(seller, server)
+
+        def create(owner, role, scope="messaging"):
+            agent = owner.post("/agents", json={
+                "name": f"Agent {uuid4().hex}", "description": "Agent test fixture", "role":role,
+            }).raise_for_status().json()
+            key = owner.post("/me/credentials", json={"agent_id":agent["id"], "scope":scope}).raise_for_status().json()
+            return agent, key
+
+        buyer_agent, buyer_key = create(buyer, "buyer")
+        seller_agent, seller_key = create(seller, "supplier")
+        _, isolated_key = create(seller, "supplier")
+        _, catalog_key = create(buyer, "buyer", "catalog")
+        service = seller.post(f"/agents/{seller_agent['id']}/services", json={
+            "title":"Agent printing", "category":"printing", "description":"Print on demand",
+            "delivery_days":2, "language":"en",
+        }).raise_for_status().json()
+        contact = {"service_id":service["id"], "body":"Please describe your printing options.", "client_id":str(uuid4())}
+        assert asyncio.run(call_tool(server, catalog_key["token"], "start_conversation", {"contact":contact})).isError
+        started = asyncio.run(call_tool(server, buyer_key["token"], "start_conversation", {"contact":contact}))
+        assert not started.isError, started
+        thread = started.structuredContent
+        assert thread["initiator_agent_id"] == buyer_agent["id"]
+        assert thread["recipient_agent_id"] == seller_agent["id"]
+        UUID(thread["id"])
+        base = "/agent-conversations"
+        path = base + "/" + thread["id"] + "/messages"
+        seller_headers = {"Authorization":f"Bearer {seller_key['token']}"}
+        isolated_headers = {"Authorization":f"Bearer {isolated_key['token']}"}
+        assert seller.get(path, headers=isolated_headers).status_code == 404
+        assert seller.get(base, headers=isolated_headers).json() == []
+        assert seller.get(base, headers=seller_headers).json()[0]["id"] == thread["id"]
+        first = seller.get(path, headers=seller_headers).raise_for_status().json()[0]
+        assert first["sender_type"] == "agent" and first["agent_id"] == buyer_agent["id"]
+        message = {"body":"We print booklets.", "client_id":str(uuid4())}
+        reply = {"thread_id":thread["id"], "message":message}
+        assert not asyncio.run(call_tool(server, seller_key["token"], "send_message", reply)).isError
+        assert not asyncio.run(call_tool(server, seller_key["token"], "send_message", reply)).isError
+        polled = asyncio.run(call_tool(server, buyer_key["token"], "get_messages", {
+            "thread_id":thread["id"], "after": first["sequence"],
+        }))
+        rows = polled.structuredContent["result"]
+        assert len(rows) == 1 and rows[0]["agent_id"] == seller_agent["id"]
+        human = seller.get("/conversations/" + thread["id"] + "/messages").raise_for_status().json()
+        assert len(human) == 2
+        assert seller.delete("/me/credentials/" + seller_key["id"]).status_code == 200
+        assert seller.get(path, headers=seller_headers).status_code == 401

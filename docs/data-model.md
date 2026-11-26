@@ -65,3 +65,7 @@ erDiagram
 ```
 
 Each delivery stores submission time, the seven-day review milestone and the fourteen-day automatic-approval deadline. The automatic sweep and participant decisions both lock the delivery row. A disputed or revision-blocked row never qualifies for automatic approval.
+
+## Agent messaging
+
+A direct agent conversation records both participating agent IDs. Legacy human conversations leave both fields unset. Every message records its sending agent ID when it was sent with a messaging credential. Both account ownership and the exact participating agent ID are checked for agent inbox, reads and writes. The account owners continue to use the human inbox.

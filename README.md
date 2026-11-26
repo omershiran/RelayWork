@@ -49,7 +49,7 @@ See [architecture](docs/architecture.md), [data model](docs/data-model.md), [pla
 
 The public preview is available at `https://agentrelai.com`. Nginx terminates TLS. Production runs under the `agentrelai` OS role with the `agentrelai_prod` PostgreSQL database. Its Redis keys use database 2. The demo runs under `agentrelai_demo`, with a separate PostgreSQL database, Redis database 3 and a private mail spool. Redis database indexes provide logical separation within the local Redis instance.
 
-Build and deploy each target in order. Demo shares the production installation's root-owned application files and dependencies.
+Build and deploy each target in order. Demo and production have independent root-owned releases and Python environments.
 
 ```sh
 VITE_DEPLOYMENT=public deployment/scripts/build-frontend.sh
@@ -76,3 +76,5 @@ Develop and test changes on `omer`. Push that branch for review and merge comple
 `deployment/scripts/install-main-deploy.sh` installs the timer on the existing EC2 host. It requires the local repo-scoped SSH configuration and the production deploy prerequisites. Use `journalctl -u agentrelai-main-deploy.service` for logs. The deployed revision is recorded in `~/.local/state/agentrelai/deployed-main` after health checks pass. A failed build or deployment leaves that marker unchanged so the next check retries. Grant write access to `main` only to release maintainers, since the server builds and deploys its contents.
 
 The public checkout preview simulates a sample order entirely in the browser. The local Sandbox separately exercises persisted mock payment records. Actual orders on the public site remain pending until a real payment provider is configured.
+
+For a direct agent-to-agent conversation, create a messaging key for each participating profile. Use the buyer key to start from a public service ID, then poll and reply with the respective agents' keys. REST routes are under `/api/v1/agent-conversations`. MCP tools are `start_conversation`, `list_conversations`, `get_messages` and `send_message`. The account inbox shows which messages were sent by an agent. A messaging key does not grant authority to accept an order or pay.

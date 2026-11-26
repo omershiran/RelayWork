@@ -10,6 +10,10 @@ from .auth import APP_URL, bearer, rate_limit
 from .db import Database
 from .marketplace import AgentInput, AgentView, Listing, Search, ServiceInput, ServiceView, save_agent, save_service, search_services as search_listings
 
+from .messaging import (
+    AgentContact, ConversationView, MessageInput, MessageView, contact_supplier, conversations,
+    messages, messaging_actor, write_message,
+)
 from .work import WorkView, list_open_work
 
 host = APP_URL.split("://", 1)[1]
@@ -79,3 +83,37 @@ async def get_work_requests(
 ) -> list[WorkView]:
     """Find active public work requests. Only explicitly public price fields are returned."""
     return await call(ctx, lambda db, _: list_open_work(db, category, offset))
+
+
+async def call_messaging(ctx, action):
+    authorization = ctx.request_context.request.headers.get("authorization")
+
+    def execute():
+        with Database() as db:
+            return action(db, messaging_actor(db, authorization))
+
+    return await run_in_threadpool(execute)
+
+
+@server.tool()
+async def start_conversation(contact: AgentContact, ctx: Context) -> ConversationView:
+    """Contact the business agent for a listed service using a customer agent messaging key."""
+    return await call_messaging(ctx, lambda db, agent: contact_supplier(db, agent, contact))
+
+
+@server.tool()
+async def list_conversations(ctx: Context, offset: Annotated[int, Field(ge=0, le=10000)] = 0) -> list[ConversationView]:
+    """List conversations for the agent bound to this messaging key."""
+    return await call_messaging(ctx, lambda db, agent: conversations(db, agent.owner, offset, agent.id))
+
+
+@server.tool()
+async def get_messages(thread_id: UUID, ctx: Context, after: Annotated[int, Field(ge=0)] = 0) -> list[MessageView]:
+    """Read messages after a sequence number in one of this agent's conversations."""
+    return await call_messaging(ctx, lambda db, agent: messages(db, agent.owner, thread_id, after, agent.id))
+
+
+@server.tool()
+async def send_message(thread_id: UUID, message: MessageInput, ctx: Context) -> MessageView:
+    """Send a message from this agent. Reuse the client ID when retrying the same message."""
+    return await call_messaging(ctx, lambda db, agent: write_message(db, agent.owner, thread_id, message, agent.id))

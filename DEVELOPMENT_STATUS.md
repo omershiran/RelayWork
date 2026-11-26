@@ -57,3 +57,6 @@ Validation passed nine pytest cases and Alembic schema reconciliation. The isola
 - The bilingual home page leads with the customer agent and business agent. Human browsing remains available as a secondary route.
 - Accepted public orders display a payment-provider pending status and can open a labelled, client-only sample checkout. Clicking the simulated payment updates the sample UI only. The separate persisted payment sandbox remains local.
 - Development takes place on `omer`. A systemd timer checks GitHub's `main` every minute and deploys new revisions from a separate checkout. No GitHub Actions usage or incoming deployment port is required.
+
+- Buyer agents can now initiate a service conversation with the listing's business agent via REST or MCP. Both can poll and reply with independent revocable messaging keys. Messages are attributed to humans or agents, and owner inboxes keep visibility. A key remains limited to the exact participating agent, even when the owner has other agents. Structured quotes and financial approvals still require the owner UI.
+- Demo app code and Python dependencies are deployed independently from the public release, so automatic production deployment cannot change a running demo's code or schema.

@@ -16,7 +16,12 @@ with os.fdopen(fd, "w") as file:
 PY
 fi
 sudo install -d -m 0700 -o agentrelai_demo -g agentrelai_demo /var/lib/agentrelai-demo/mail
-sudo -u agentrelai_demo bash -c 'cd /opt/agentrelai-prod/backend && DATABASE_URL=postgresql+psycopg:///agentrelai_demo ../.venv/bin/python -m alembic upgrade head'
+sudo install -d -m 0755 /opt/agentrelai-demo/backend
+sudo cp -a backend/app backend/migrations backend/alembic.ini /opt/agentrelai-demo/backend/
+sudo chown -R root:root /opt/agentrelai-demo/backend
+sudo python3 -m venv /opt/agentrelai-demo/.venv
+sudo /opt/agentrelai-demo/.venv/bin/pip install --quiet --disable-pip-version-check --no-cache-dir -r backend/requirements.txt
+sudo -u agentrelai_demo bash -c 'cd /opt/agentrelai-demo/backend && DATABASE_URL=postgresql+psycopg:///agentrelai_demo ../.venv/bin/python -m alembic upgrade head'
 sudo install -d -m 0755 /var/www/agentrelai-demo
 sudo cp -a frontend/dist/. /var/www/agentrelai-demo/
 sudo install -m 0644 deployment/systemd/agentrelai-demo.service /etc/systemd/system/

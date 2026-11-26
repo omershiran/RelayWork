@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -46,6 +46,7 @@ class Action(Input):
 
 class KeyInput(Input):
     agent_id: UUID | None = None
+    scope: Literal["catalog", "messaging"] = "catalog"
 
 
 def limit_email(request, address):
@@ -163,8 +164,10 @@ def create_key(data: KeyInput, request: Request, response: Response, db: DB):
     rate_limit(f"new-key:{user.id}", 12, 3600)
     if data.agent_id:
         owned_agent(db, user.id, data.agent_id)
+    elif data.scope == "messaging":
+        raise HTTPException(422, "agent_required")
     raw, key = issue_token(db, user, None, Credential, timedelta(days=30 if data.agent_id else 1),
-                           agent_id=data.agent_id, scope="catalog" if data.agent_id else "register")
+                           agent_id=data.agent_id, scope=data.scope if data.agent_id else "register")
     db.commit()
     response.headers["Cache-Control"] = "no-store"
     return {"id": key.id, "token": raw, "expires": key.expires}

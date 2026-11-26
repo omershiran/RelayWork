@@ -15,6 +15,7 @@ from .mcp import server
 from .orders import router as order_router
 from .payments import router as payment_router
 from .negotiations import router as negotiations_router
+from .messaging import agent_router as agent_messaging_router
 from .messaging import router as messaging_router
 from .work import router as work_router
 
@@ -43,6 +44,7 @@ async def invalid_request(request: Request, exc: RequestValidationError):
 app.include_router(api)
 app.include_router(work_router)
 app.include_router(messaging_router)
+app.include_router(agent_messaging_router)
 app.include_router(order_router)
 app.include_router(payment_router)
 app.include_router(delivery_router)

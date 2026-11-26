@@ -147,7 +147,10 @@ function AgentEditor({t, agent, onSave, onKey}) {
       <label className="checkbox"><input name="visible" type="checkbox" defaultChecked={agent?.visible ?? true}/>{t.visible}</label>
       <button disabled={action.busy}>{t.saveAgent}</button>
     </form>{action.status}
-    {saved && <p><button className="secondary" onClick={() => onKey(saved.id)}>{t.createKey}</button></p>}
+    {saved && <div className="actions">
+      <button className="secondary" onClick={() => onKey(saved.id)}>{t.createKey}</button>
+      <button className="secondary" onClick={() => onKey(saved.id, "messaging")}>{t.messageKey}</button>
+    </div>}
     {saved && saved.role !== "buyer" && <ServiceEditor t={t} agentId={saved.id}/>}
   </article>;
 }
@@ -188,10 +191,10 @@ function Account({t, user, setUser}) {
   }, [user]);
   if (user === undefined) return <section className="wrap body"><p>{t.loading}</p></section>;
   if (!user) return <AuthForm t={t} setUser={setUser}/>;
-  function createKey(agentId = null) {
+  function createKey(agentId = null, scope = "catalog") {
     setSecret("");
     action.run(async () => {
-      const credential = await api("/me/credentials", "POST", {agent_id:agentId});
+      const credential = await api("/me/credentials", "POST", {agent_id:agentId, scope});
       setSecret(credential.token);
       await loadKeys();
     });

@@ -5,10 +5,10 @@ import {Quotes} from "./quotes";
 
 export const messagingLabels = {
   en:{inbox:"Conversations", contact:"Contact", message:"Message", send:"Send", mine:"You",
-      other:"Other party", noThreads:"You have no conversations.", signInMessage:"Sign in to send a message.",
+      other:"Other party", agentSender:"Agent", noThreads:"You have no conversations.", signInMessage:"Sign in to send a message.",
       messages:"Messages", earlier:"Back to conversations"},
   he:{inbox:"שיחות", contact:"יצירת קשר", message:"הודעה", send:"שליחה", mine:"אתם",
-      other:"הצד השני", noThreads:"אין לכם שיחות.", signInMessage:"התחברו כדי לשלוח הודעה.",
+      other:"הצד השני", agentSender:"סוכן", noThreads:"אין לכם שיחות.", signInMessage:"התחברו כדי לשלוח הודעה.",
       messages:"הודעות", earlier:"חזרה לשיחות"}
 };
 
@@ -93,7 +93,7 @@ function Thread({t, lang, user, threadId}) {
   return <section className="wrap body narrow"><Link to="/messages">{t.earlier}</Link><h1>{t.messages}</h1>
     {pollError && <p role="alert">{t.error}</p>}
     {messages.map(message => <article className="card message" key={message.id}>
-      <strong>{message.mine ? t.mine : t.other}</strong>
+      <strong>{message.mine ? t.mine : t.other}{message.sender_type === "agent" && " · " + t.agentSender}</strong>
       <time dateTime={message.created_at}>{date.format(new Date(message.created_at))}</time>
       <p>{message.body}</p>
     </article>)}
