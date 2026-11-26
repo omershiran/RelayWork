@@ -2,11 +2,11 @@ import React, {useEffect, useRef, useState} from "react";
 import {api, useAction} from "./shared";
 
 const labels = {
-  en: {title:"Sandbox delivery", deliver:"Submit deliverable", body:"Deliverable text", revise:"Request revision",
+  en: {title:"Sandbox delivery", deliver:"Submit deliverable", body:"Deliverable text", file:"Attachment (PDF, PNG, JPEG or TXT, up to 5 MB)", missing:"Enter text or select a file.", tooLarge:"The file exceeds 5 MB.", revise:"Request revision",
     dispute:"Open dispute", approve:"Approve delivery", reason:"Reason", planned:"Automatic approval",
     DELIVERED:"Delivered", APPROVED:"Approved", AUTO_APPROVED:"Automatically approved",
     REVISION_REQUESTED:"Revision requested", DISPUTED:"Disputed"},
-  he: {title:"אספקה בסביבת הדגמה", deliver:"מסירת תוצר", body:"טקסט התוצר", revise:"בקשת תיקון",
+  he: {title:"אספקה בסביבת הדגמה", deliver:"מסירת תוצר", body:"טקסט התוצר", file:"קובץ מצורף (PDF, PNG, JPEG או TXT, עד 5MB)", missing:"הזינו טקסט או בחרו קובץ.", tooLarge:"גודל הקובץ חורג מ־5MB.", revise:"בקשת תיקון",
     dispute:"פתיחת סכסוך", approve:"אישור תוצר", reason:"סיבה", planned:"אישור אוטומטי",
     DELIVERED:"נמסר", APPROVED:"אושר", AUTO_APPROVED:"אושר אוטומטית",
     REVISION_REQUESTED:"נדרש תיקון", DISPUTED:"בסכסוך"}
@@ -17,6 +17,8 @@ export function SandboxDelivery({t, lang, threadId, buyer}) {
   const [rows, setRows] = useState([]);
   const [decision, setDecision] = useState(null);
   const prior = useRef(null);
+  const [file, setFile] = useState(null);
+  const [inputError, setInputError] = useState("");
   const base = "/conversations/" + threadId + "/deliveries";
   const words = labels[lang];
   const current = rows.at(-1);
@@ -44,7 +46,10 @@ export function SandboxDelivery({t, lang, threadId, buyer}) {
   }
   return <section className="publish"><h3>{words.title}</h3>{action.status}
     {rows.map(row => <article className="card message" key={row.id}>
-      <strong>{words[row.state]}</strong><p>{row.body}</p>
+      <strong>{words[row.state]}</strong>{row.body && <p>{row.body}</p>}
+      {row.attachment && <p><a href={"/api/v1" + base + "/" + row.id + "/attachment"} download>
+        {row.attachment.name}
+      </a></p>}
       {row.reason && <p>{words.reason} · {row.reason}</p>}
       {row.state === "DELIVERED" && <p>{words.planned} · {new Date(row.auto_approve_at).toLocaleString(lang)}</p>}
     </article>)}
@@ -52,11 +57,30 @@ export function SandboxDelivery({t, lang, threadId, buyer}) {
       event.preventDefault();
       const form = event.currentTarget;
       const body = new FormData(form).get("body");
-      if (prior.current?.body !== body) prior.current = {body, client_id:crypto.randomUUID()};
+      setInputError("");
+      if (!body.trim() && !file) { setInputError(words.missing); return; }
+      if (file && file.size > 5 * 1024 * 1024) { setInputError(words.tooLarge); return; }
+      if (prior.current?.body !== body || prior.current?.file !== file) {
+        prior.current = {body, file, client_id:crypto.randomUUID()};
+      }
+      const {client_id} = prior.current;
       action.run(async () => {
-        await api(base, "POST", prior.current); prior.current = null; form.reset(); await refresh();
+        if (file) {
+          const payload = new FormData();
+          payload.set("body", body);
+          payload.set("client_id", client_id);
+          payload.set("attachment", file);
+          await api(base + "/upload", "POST", payload);
+        } else {
+          await api(base, "POST", {body, client_id});
+        }
+        prior.current = null; form.reset(); setFile(null); await refresh();
       });
-    }}><label>{words.body}<textarea name="body" maxLength={10000} required/></label>
+    }}><label>{words.body}<textarea name="body" maxLength={10000}/></label>
+      <label>{words.file}<input type="file" accept=".pdf,.png,.jpg,.jpeg,.txt" onChange={event => {
+        setFile(event.target.files[0] || null); setInputError("");
+      }}/></label>
+      {inputError && <p className="error" role="alert">{inputError}</p>}
       <button disabled={action.busy}>{words.deliver}</button>
     </form>}
     {current && ["DELIVERED", "REVISION_REQUESTED"].includes(current.state) && <div className="actions">

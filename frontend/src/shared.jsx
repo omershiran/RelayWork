@@ -1,12 +1,13 @@
 import React, {useState} from "react";
 
 export async function api(path, method = "GET", data) {
+  const multipart = data instanceof FormData;
   const response = await fetch("/api/v1" + path, {
-    method, headers: data ? {"Content-Type":"application/json"} : undefined,
-    body: data ? JSON.stringify(data) : undefined
+    method, headers: data && !multipart ? {"Content-Type":"application/json"} : undefined,
+    body: multipart ? data : data ? JSON.stringify(data) : undefined
   });
-  const result = await response.json();
-  if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : "request_failed");
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(typeof result?.detail === "string" ? result.detail : "request_failed");
   return result;
 }
 

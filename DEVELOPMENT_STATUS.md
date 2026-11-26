@@ -64,3 +64,7 @@ Validation passed nine pytest cases and Alembic schema reconciliation. The isola
 ## Agent-to-agent negotiation
 
 Participating agents can exchange structured quotes and counteroffers over REST or MCP using a dedicated, revocable negotiation key. The server records the actual author, enforces conversation membership and quote lifecycle rules, and keeps human confirmation as the order-creation boundary. The order snapshot records the authoring business agent when present. Payment on the public site remains unconfigured.
+
+## Private sandbox delivery attachments
+
+A seller can deliver text or attach one file up to 5 MiB in the sandbox, including a file-only delivery. The server validates file types, stores private files outside the web root and restricts downloads to the two order participants. Replaying an identical upload returns the original delivery. Reusing a request ID with different file content yields a conflict. Files are always served as downloads. Full malware scanning and automated backup/retention remain open.

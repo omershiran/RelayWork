@@ -16,6 +16,7 @@ with os.fdopen(fd, "w") as file:
 PY
 fi
 sudo install -d -m 0700 -o agentrelai_demo -g agentrelai_demo /var/lib/agentrelai-demo/mail
+sudo install -d -m 0700 -o agentrelai_demo -g agentrelai_demo /var/lib/agentrelai-demo/deliveries
 sudo install -d -m 0755 /opt/agentrelai-demo/backend
 sudo cp -a backend/app backend/migrations backend/alembic.ini /opt/agentrelai-demo/backend/
 sudo chown -R root:root /opt/agentrelai-demo/backend

@@ -66,7 +66,34 @@ def submit_delivery(buyer, supplier, path):
     return delivery
 
 
-def verify_deliveries(buyer, supplier, path):
+def submit_attachment(buyer, supplier, outsider, path):
+    endpoint = path + "/deliveries/upload"
+    data = {"client_id":str(uuid4())}
+    content = "תוצר לדוגמה".encode()
+    files = {"attachment":("תוצר.txt", content, "text/plain")}
+    assert buyer.post(endpoint, data=data, files=files).status_code == 403
+    assert outsider.post(endpoint, data=data, files=files).status_code == 404
+    spoof = {"attachment":("fake.png", content, "image/png")}
+    assert supplier.post(endpoint, data=data, files=spoof).status_code == 415
+    result = supplier.post(endpoint, data=data, files=files).raise_for_status().json()
+    assert result["attachment"]["name"] == "תוצר.txt"
+    assert result["attachment"]["size_bytes"] == len(content)
+    assert supplier.post(endpoint, data=data, files=files).raise_for_status().json() == result
+    changed = {"attachment":("תוצר.txt", b"changed", "text/plain")}
+    assert supplier.post(endpoint, data=data, files=changed).status_code == 409
+    download = path + "/deliveries/" + result["id"] + "/attachment"
+    assert outsider.get(download).status_code == 404
+    assert buyer.get(path + "/deliveries").raise_for_status().json()[0]["attachment"] == result["attachment"]
+    for participant in [buyer, supplier]:
+        response = participant.get(download).raise_for_status()
+        assert response.content == content
+        assert response.headers["content-type"] == "application/octet-stream"
+        assert response.headers["content-disposition"].startswith("attachment;")
+        assert response.headers["cache-control"] == "private, no-store"
+    return result
+
+
+def verify_deliveries(buyer, supplier, outsider, path):
     first = submit_delivery(buyer, supplier, path)
     response = buyer.post(path + "/deliveries/" + first["id"] + "/decision", json={"action":"revise","reason":"Improve the output"})
     assert response.raise_for_status().json()["state"] == "REVISION_REQUESTED"
@@ -89,7 +116,7 @@ def verify_deliveries(buyer, supplier, path):
     manual_path = verified_order(buyer, supplier)
     buyer.post(manual_path + "/payment").raise_for_status()
     buyer.post(manual_path + "/sandbox-checkout").raise_for_status()
-    manual = submit_delivery(buyer, supplier, manual_path)
+    manual = submit_attachment(buyer, supplier, outsider, manual_path)
     approval = buyer.post(manual_path + "/deliveries/" + manual["id"] + "/decision", json={"action":"approve"})
     assert approval.raise_for_status().json()["state"] == "APPROVED"
 
@@ -98,9 +125,11 @@ def run():
     with (
         httpx.Client(base_url=ORIGIN + "/api/v1", headers={"Origin": ORIGIN}) as buyer,
         httpx.Client(base_url=ORIGIN + "/api/v1", headers={"Origin": ORIGIN}) as supplier,
+        httpx.Client(base_url=ORIGIN + "/api/v1", headers={"Origin":ORIGIN}) as outsider,
     ):
         signup(buyer)
         signup(supplier)
+        signup(outsider)
         thread = verified_order(buyer, supplier)
         payment_path = thread + "/payment"
         checkout = thread + "/sandbox-checkout"
@@ -117,7 +146,7 @@ def run():
         assert buyer.post(checkout).raise_for_status().json() == confirmed
         assert supplier.get(payment_path).raise_for_status().json() == confirmed
         assert supplier.get(thread + "/order").raise_for_status().json()["payment_status"] == "SANDBOX_CONFIRMED"
-        verify_deliveries(buyer, supplier, thread)
+        verify_deliveries(buyer, supplier, outsider, thread)
 
     query = """
         select count(*), sum(l.signed_cents) from financial_ledger l
@@ -128,7 +157,7 @@ def run():
     assert ledger.strip() == "2|0"
     response = httpx.post("https://agentrelai.com/api/v1/payments/sandbox/callback", json={})
     assert response.status_code == 503
-    print("Sandbox checkout, signature and ledger, delivery, revision, dispute hold and manual/automatic approvals verified.")
+    print("Sandbox checkout, signature and ledger, private attachment delivery, revision, dispute hold and manual/automatic approvals verified.")
 
 
 if __name__ == "__main__":

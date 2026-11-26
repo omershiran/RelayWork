@@ -21,7 +21,7 @@ const en = {
   createKey:"Create catalog key", messageKey:"Create messaging key", negotiationKey:"Create negotiation key", registerKey:"Create registration key", keys:"Active API keys", revoke:"Revoke",
   saved:"Saved.", published:"Service published.", verificationNeeded:"Verify your email to create agents and keys.",
   back:"Back to marketplace", catalog:"Catalog", sandbox:"Sandbox · No real charges", preview:"Public preview", development:"Development environment", error:"The request could not be completed.",
-  errors:{invalid_login:"Email or password is incorrect.", invalid_account_link:"The link or password is invalid.",
+  errors:{invalid_delivery_file_type:"Choose a valid PDF, PNG, JPEG or UTF-8 text file.", invalid_login:"Email or password is incorrect.", invalid_account_link:"The link or password is invalid.",
     email_unavailable:"Email delivery is unavailable.", rate_limited:"Too many attempts. Try again shortly.",
     agent_not_found:"This agent profile is unavailable.", supplier_role_required:"Choose a supplier role to publish services."}
 };
@@ -48,7 +48,7 @@ const he = {
   createKey:"יצירת מפתח קטלוג", messageKey:"יצירת מפתח תקשורת", negotiationKey:"יצירת מפתח למשא ומתן", registerKey:"יצירת מפתח רישום", keys:"מפתחות API פעילים", revoke:"ביטול",
   saved:"נשמר.", published:"השירות פורסם.", verificationNeeded:"יש לאמת אימייל כדי ליצור סוכנים ומפתחות.",
   back:"חזרה לשוק השירותים", catalog:"קטלוג", sandbox:"סביבת הדגמה · ללא חיובים אמיתיים", preview:"גרסת תצוגה ציבורית", development:"סביבת פיתוח", error:"לא ניתן להשלים את הבקשה.",
-  errors:{invalid_login:"האימייל או הסיסמה שגויים.", invalid_account_link:"הקישור או הסיסמה שגויים.",
+  errors:{invalid_delivery_file_type:"בחרו קובץ PDF, PNG, JPEG או קובץ טקסט UTF-8 תקין.", invalid_login:"האימייל או הסיסמה שגויים.", invalid_account_link:"הקישור או הסיסמה שגויים.",
     email_unavailable:"שליחת אימייל אינה זמינה.", rate_limited:"בוצעו יותר מדי ניסיונות. נסו שוב בקרוב.",
     agent_not_found:"פרופיל הסוכן אינו זמין.", supplier_role_required:"בחרו תפקיד ספק כדי לפרסם שירותים."}
 };

@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import Field
 from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, select
 from sqlalchemy.orm import Mapped, mapped_column
@@ -10,11 +11,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 from .api import DB
 from .auth import browser_user, now, rate_limit
 from .db import Base
+from .delivery_file import DeliveryFile, validate_file
 from .marketplace import Input, project
 from .messaging import mutating, thread
 from .orders import Order
 from .payment_models import Payment
 from .payments import sandbox_provider
+from .storage import StorageFull, delivery_storage
 
 router = APIRouter(prefix="/api/v1/conversations/{thread_id}")
 
@@ -51,9 +54,19 @@ class DeliveryInput(Input):
     body: str = Field(min_length=1, max_length=10000)
 
 
+class AttachedDeliveryInput(DeliveryInput):
+    body: str = Field(default="", max_length=10000)
+
+
 class Decision(Input):
     action: Literal["approve", "revise", "dispute"]
     reason: str | None = Field(default=None, min_length=3, max_length=4000)
+
+
+class AttachmentView(Input):
+    id: UUID
+    name: str
+    size_bytes: int
 
 
 class DeliveryView(Input):
@@ -65,6 +78,7 @@ class DeliveryView(Input):
     auto_approve_at: datetime
     decided_at: datetime | None
     reason: str | None
+    attachment: AttachmentView | None = None
 
 
 def scope(db, request, thread_id, *, lock=False):
@@ -87,24 +101,43 @@ def latest(db, order_id, *, lock=False):
     return db.scalar(query.with_for_update() if lock else query)
 
 
+def delivery_view(row, attachment=None):
+    view = project(DeliveryView, row)
+    if attachment is not None:
+        view.attachment = project(AttachmentView, attachment)
+    return view
+
+
+def stored_attachment(db, delivery_id):
+    return db.scalar(select(DeliveryFile).where(DeliveryFile.delivery_id == delivery_id))
+
+
 @router.get("/deliveries", response_model=list[DeliveryView])
 def read_deliveries(thread_id: UUID, request: Request, db: DB):
     _, order = scope(db, request, thread_id)
-    rows = db.scalars(select(Delivery).where(Delivery.order_id == order.id).order_by(Delivery.delivered_at, Delivery.id))
-    return [project(DeliveryView, row) for row in rows]
+    rows = db.execute(select(Delivery, DeliveryFile).outerjoin(
+        DeliveryFile, DeliveryFile.delivery_id == Delivery.id
+    ).where(Delivery.order_id == order.id).order_by(Delivery.delivered_at, Delivery.id))
+    return [delivery_view(row, attachment) for row, attachment in rows]
 
 
-@router.post("/deliveries", status_code=201, response_model=DeliveryView, dependencies=mutating)
-def deliver(thread_id: UUID, data: DeliveryInput, request: Request, db: DB):
+def supplier_order(db, request, thread_id):
     user, order = scope(db, request, thread_id, lock=True)
     if user.id != order.supplier:
         raise HTTPException(403, "delivery_supplier_required")
     rate_limit(f"delivery:{user.id}", 30, 3600)
+    return order
+
+
+def submit_delivery(db, order, data, uploaded=None):
     previous = db.scalar(select(Delivery).where(Delivery.order_id == order.id, Delivery.client_id == data.client_id))
     if previous:
-        if previous.body != data.body:
+        attachment = stored_attachment(db, previous.id)
+        stored = (attachment.name, attachment.digest) if attachment else None
+        incoming = (uploaded[0], uploaded[2]) if uploaded else None
+        if previous.body != data.body or stored != incoming:
             raise HTTPException(409, "idempotency_conflict")
-        return project(DeliveryView, previous)
+        return delivery_view(previous, attachment)
     current = latest(db, order.id, lock=True)
     if current and current.state != "REVISION_REQUESTED":
         raise HTTPException(409, "delivery_state_conflict")
@@ -113,8 +146,49 @@ def deliver(thread_id: UUID, data: DeliveryInput, request: Request, db: DB):
                    delivered_at=timestamp, agent_review_at=timestamp + timedelta(days=7),
                    auto_approve_at=timestamp + timedelta(days=14))
     db.add(row)
+    attachment = None
+    if uploaded:
+        name, content, digest = uploaded
+        db.flush()
+        attachment = DeliveryFile(delivery_id=row.id, name=name, digest=digest, size_bytes=len(content))
+        db.add(attachment)
+        db.flush()
+        try:
+            delivery_storage().store(attachment.id, content)
+        except (StorageFull, OSError):
+            raise HTTPException(503, "delivery_storage_unavailable") from None
+    # Keep the file if the database commit fails ambiguously. An unreferenced file has no download route.
     db.commit()
-    return project(DeliveryView, row)
+    return delivery_view(row, attachment)
+
+
+@router.post("/deliveries", status_code=201, response_model=DeliveryView, dependencies=mutating)
+def deliver(thread_id: UUID, data: DeliveryInput, request: Request, db: DB):
+    return submit_delivery(db, supplier_order(db, request, thread_id), data)
+
+
+@router.post("/deliveries/upload", status_code=201, response_model=DeliveryView, dependencies=mutating)
+def upload_delivery(thread_id: UUID, request: Request, db: DB,
+                    client_id: Annotated[UUID, Form()], attachment: Annotated[UploadFile, File()],
+                    body: Annotated[str, Form(max_length=10000)] = ""):
+    order = supplier_order(db, request, thread_id)
+    return submit_delivery(db, order, AttachedDeliveryInput(client_id=client_id, body=body), validate_file(attachment))
+
+
+@router.get("/deliveries/{delivery_id}/attachment", response_class=FileResponse)
+def download_attachment(thread_id: UUID, delivery_id: UUID, request: Request, db: DB):
+    _, order = scope(db, request, thread_id)
+    attachment = db.scalar(select(DeliveryFile).join(Delivery, Delivery.id == DeliveryFile.delivery_id).where(
+        DeliveryFile.delivery_id == delivery_id, Delivery.order_id == order.id
+    ))
+    if attachment is None:
+        raise HTTPException(404, "delivery_file_not_found")
+    path = delivery_storage().path(attachment.id)
+    if not path.is_file():
+        raise HTTPException(503, "delivery_storage_unavailable")
+    return FileResponse(path, media_type="application/octet-stream", filename=attachment.name, headers={
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+    })
 
 
 @router.post("/deliveries/{delivery_id}/decision", response_model=DeliveryView, dependencies=mutating)
@@ -127,7 +201,7 @@ def decide(thread_id: UUID, delivery_id: UUID, data: Decision, request: Request,
         raise HTTPException(404, "delivery_not_found")
     state = {"approve": "APPROVED", "revise": "REVISION_REQUESTED", "dispute": "DISPUTED"}[data.action]
     if row.state == state and row.reason == data.reason:
-        return project(DeliveryView, row)
+        return delivery_view(row, stored_attachment(db, row.id))
     allowed = {"DELIVERED", "REVISION_REQUESTED"} if data.action == "dispute" else {"DELIVERED"}
     if row.state not in allowed:
         raise HTTPException(409, "delivery_state_conflict")
@@ -140,7 +214,7 @@ def decide(thread_id: UUID, delivery_id: UUID, data: Decision, request: Request,
     row.decided_at = timestamp
     row.reason = data.reason
     db.commit()
-    return project(DeliveryView, row)
+    return delivery_view(row, stored_attachment(db, row.id))
 
 
 def auto_approve(db, timestamp):

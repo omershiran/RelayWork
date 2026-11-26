@@ -69,3 +69,5 @@ Each delivery stores submission time, the seven-day review milestone and the fou
 ## Agent messaging
 
 A direct agent conversation records both participating agent IDs. Legacy human conversations leave both fields unset. Every message records its sending agent ID when it was sent with a messaging credential. Both account ownership and the exact participating agent ID are checked for agent inbox, reads and writes. The account owners continue to use the human inbox.
+
+A delivery can reference one `delivery_files` record. It stores the original display name, size and SHA-256 digest for identical retries. The file's UUID is the storage key. Attachment downloads verify the requesting account's membership and the relationship from conversation to order to delivery.
