@@ -49,6 +49,51 @@ def verified_order(buyer, supplier):
     return path
 
 
+def sql(query, **parameters):
+    args = ["sudo", "-u", "agentrelai_demo", "psql", "-At", "-d", "agentrelai_demo", "-v", "ON_ERROR_STOP=1"]
+    for key, value in parameters.items():
+        args.extend(["-v", f"{key}={value}"])
+    return subprocess.check_output(args, input=query, text=True).strip()
+
+
+def submit_delivery(buyer, supplier, path):
+    payload = {"client_id": str(uuid4()), "body": "Private sandbox delivery"}
+    assert buyer.post(path + "/deliveries", json=payload).status_code == 403
+    delivery = supplier.post(path + "/deliveries", json=payload).raise_for_status().json()
+    assert supplier.post(path + "/deliveries", json=payload).raise_for_status().json() == delivery
+    assert datetime.fromisoformat(delivery["agent_review_at"]) - datetime.fromisoformat(delivery["delivered_at"]) == timedelta(days=7)
+    assert datetime.fromisoformat(delivery["auto_approve_at"]) - datetime.fromisoformat(delivery["delivered_at"]) == timedelta(days=14)
+    return delivery
+
+
+def verify_deliveries(buyer, supplier, path):
+    first = submit_delivery(buyer, supplier, path)
+    response = buyer.post(path + "/deliveries/" + first["id"] + "/decision", json={"action":"revise","reason":"Improve the output"})
+    assert response.raise_for_status().json()["state"] == "REVISION_REQUESTED"
+    updated = submit_delivery(buyer, supplier, path)
+    dispute = supplier.post(path + "/deliveries/" + updated["id"] + "/decision", json={"action":"dispute","reason":"Scope disagreement"})
+    assert dispute.raise_for_status().json()["state"] == "DISPUTED"
+    assert buyer.post(path + "/deliveries/" + updated["id"] + "/decision", json={"action":"approve"}).status_code == 409
+
+    auto_path = verified_order(buyer, supplier)
+    buyer.post(auto_path + "/payment").raise_for_status()
+    buyer.post(auto_path + "/sandbox-checkout").raise_for_status()
+    automatic = submit_delivery(buyer, supplier, auto_path)
+    sql("update deliveries set auto_approve_at = now() - interval '1 minute' where id in (:'first', :'disputed', :'automatic');",
+        first=first["id"], disputed=updated["id"], automatic=automatic["id"])
+    subprocess.run(["sudo", "systemctl", "start", "agentrelai-demo-approvals.service"], check=True)
+    states = [row["state"] for row in buyer.get(path + "/deliveries").raise_for_status().json()]
+    assert states == ["REVISION_REQUESTED", "DISPUTED"]
+    assert buyer.get(auto_path + "/deliveries").raise_for_status().json()[0]["state"] == "AUTO_APPROVED"
+
+    manual_path = verified_order(buyer, supplier)
+    buyer.post(manual_path + "/payment").raise_for_status()
+    buyer.post(manual_path + "/sandbox-checkout").raise_for_status()
+    manual = submit_delivery(buyer, supplier, manual_path)
+    approval = buyer.post(manual_path + "/deliveries/" + manual["id"] + "/decision", json={"action":"approve"})
+    assert approval.raise_for_status().json()["state"] == "APPROVED"
+
+
 def run():
     with (
         httpx.Client(base_url=ORIGIN + "/api/v1", headers={"Origin": ORIGIN}) as buyer,
@@ -72,21 +117,18 @@ def run():
         assert buyer.post(checkout).raise_for_status().json() == confirmed
         assert supplier.get(payment_path).raise_for_status().json() == confirmed
         assert supplier.get(thread + "/order").raise_for_status().json()["payment_status"] == "SANDBOX_CONFIRMED"
+        verify_deliveries(buyer, supplier, thread)
 
     query = """
         select count(*), sum(l.signed_cents) from financial_ledger l
         join payment_events e on l.event_id = e.id
         where e.payment_id = :'payment_id'::uuid;
     """
-    ledger = subprocess.check_output(
-        ["sudo", "-u", "agentrelai_demo", "psql", "-At", "-d", "agentrelai_demo",
-         "-v", f"payment_id={confirmed['id']}", "-v", "ON_ERROR_STOP=1"],
-        input=query, text=True,
-    )
+    ledger = sql(query, payment_id=confirmed["id"])
     assert ledger.strip() == "2|0"
     response = httpx.post("https://agentrelai.com/api/v1/payments/sandbox/callback", json={})
     assert response.status_code == 503
-    print("Sandbox checkout, forged callback rejection, replay and balanced ledger verified. Public callback disabled.")
+    print("Sandbox checkout, signature and ledger, delivery, revision, dispute hold and manual/automatic approvals verified.")
 
 
 if __name__ == "__main__":

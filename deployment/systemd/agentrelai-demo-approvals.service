@@ -1,0 +1,16 @@
+[Unit]
+Description=agentrelai sandbox delivery approval sweep
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=agentrelai_demo
+WorkingDirectory=/opt/agentrelai-prod/backend
+Environment=APP_ENV=demo
+Environment=DATABASE_URL=postgresql+psycopg:///agentrelai_demo
+Environment=PAYMENT_PROVIDER=sandbox
+EnvironmentFile=/etc/agentrelai/demo.env
+ExecStart=/opt/agentrelai-prod/.venv/bin/python -m app.delivery_worker
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true

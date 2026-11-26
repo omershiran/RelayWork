@@ -20,11 +20,13 @@ sudo -u agentrelai_demo bash -c 'cd /opt/agentrelai-prod/backend && DATABASE_URL
 sudo install -d -m 0755 /var/www/agentrelai-demo
 sudo cp -a frontend/dist/. /var/www/agentrelai-demo/
 sudo install -m 0644 deployment/systemd/agentrelai-demo.service /etc/systemd/system/
+sudo install -m 0644 deployment/systemd/agentrelai-demo-approvals.{service,timer} /etc/systemd/system/
 sudo install -m 0644 deployment/nginx/agentrelai-demo.conf /etc/nginx/sites-available/
 sudo ln -sfn /etc/nginx/sites-available/agentrelai-demo.conf /etc/nginx/sites-enabled/agentrelai-demo.conf
 sudo nginx -t
 sudo systemctl daemon-reload
 sudo systemctl enable agentrelai-demo
+sudo systemctl enable --now agentrelai-demo-approvals.timer
 sudo systemctl restart agentrelai-demo
 sudo systemctl reload nginx
 curl -fsS --retry 8 --retry-all-errors --retry-delay 1 http://127.0.0.1:8093/api/health

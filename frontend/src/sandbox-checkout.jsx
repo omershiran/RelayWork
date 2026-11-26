@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from "react";
+import {SandboxDelivery} from "./sandbox-delivery";
 import {api, useAction} from "./shared";
 
 const labels = {
@@ -12,8 +13,14 @@ export function SandboxCheckout({t, lang, threadId, buyer}) {
   const [open, setOpen] = useState(false);
   const base = "/conversations/" + threadId;
   const words = labels[lang];
-  useEffect(() => { action.run(async () => setPayment(await api(base + "/payment"))); }, [base]);
-  if (payment?.status === "SANDBOX_CONFIRMED") return <p className="note">{words.done}</p>;
+  const confirmed = payment?.status === "SANDBOX_CONFIRMED";
+  useEffect(() => {
+    action.run(async () => setPayment(await api(base + "/payment")));
+    if (buyer || confirmed) return;
+    const timer = setInterval(() => api(base + "/payment").then(setPayment).catch(() => {}), 3500);
+    return () => clearInterval(timer);
+  }, [base, buyer, confirmed]);
+  if (confirmed) return <><p className="note">{words.done}</p><SandboxDelivery t={t} lang={lang} threadId={threadId} buyer={buyer}/></>;
   if (!buyer) return action.status;
   return <div className="actions">
     {!open && <button disabled={action.busy} onClick={() => action.run(async () => {

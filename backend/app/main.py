@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from .api import api
+from .delivery import router as delivery_router
 from .auth import redis
 from .db import engine
 from .mcp import server
@@ -44,6 +45,7 @@ app.include_router(work_router)
 app.include_router(messaging_router)
 app.include_router(order_router)
 app.include_router(payment_router)
+app.include_router(delivery_router)
 app.include_router(negotiations_router)
 app.mount("/mcp", mcp_app)
 

@@ -54,3 +54,14 @@ erDiagram
 ```
 
 The sandbox serializes confirmations on the payment row. Provider event IDs are unique per provider. Two entries record each confirmation in one transaction and sum to zero in USD cents. The signed event is matched against the stored payment ID, order ID, amount and currency. Only the demo runtime can write these records. The order's commercial state and its payment status are returned separately.
+
+## Sandbox fulfillment
+
+```mermaid
+erDiagram
+    ORDERS ||--o{ DELIVERIES : receives
+    ORDERS ||--o| DISPUTES : freezes
+    DELIVERIES ||--o| DISPUTES : concerns
+```
+
+Each delivery stores submission time, the seven-day review milestone and the fourteen-day automatic-approval deadline. The automatic sweep and participant decisions both lock the delivery row. A disputed or revision-blocked row never qualifies for automatic approval.

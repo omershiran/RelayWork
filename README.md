@@ -61,6 +61,10 @@ deployment/scripts/deploy-dev.sh
 .venv/bin/python deployment/scripts/verify-demo.py
 ```
 
-The demo is reachable only on `http://127.0.0.1:8093` and uses an explicitly labelled, locally hosted Sandbox form. It signs and verifies synthetic events and writes a balanced sandbox ledger. No card details are collected. The processor adapter and commercial transactions await an external payment provider. Public account signup requires a configured SendGrid sender and key in `/etc/agentrelai/prod.env`.
+The demo is reachable only on `http://127.0.0.1:8093` and uses an explicitly labelled, locally hosted Sandbox form. It signs and verifies synthetic events and writes a balanced sandbox ledger. No card details are collected. The processor adapter and commercial transactions await an external payment provider. Public account signup uses SendGrid credentials in `/etc/agentrelai/prod.env`. The protected configuration uses no-reply@agentrelai.com. SendGrid Sandbox validated the request format and credential, and inbox delivery awaits a live signup.
 
 The HTTP vhost serves ACME challenges and redirects other requests to HTTPS. Ubuntu's Certbot timer renews the certificate and the deploy hook reloads Nginx.
+
+After demo checkout, the supplier can submit a text deliverable. The buyer can request a revision or approve, and either participant can dispute an eligible delivery. Revisions and disputes stop automatic approval. The demo uses a persistent systemd timer to process elapsed 14-day deadlines. It records the 7-day review point for future agent authorization. Files, agent approvals, dispute decisions and settlement remain open.
+
+The OpenAI Responses adapter accepts a configured model and returns token counts. `LLM_ENABLED` defaults to false. There is no public generation route. A key by itself does not start paid generation.

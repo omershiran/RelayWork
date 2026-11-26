@@ -43,3 +43,11 @@ See the deployment scripts, architecture, ERD and task plan for continuation. Re
 Validation for this milestone passed seven pytest cases, two Playwright cases against the public HTTPS URL, Alembic schema reconciliation, and an end-to-end sandbox flow. The latter verified buyer authorization, idempotent initiation and confirmation, forged callback rejection, a balanced journal and the disabled sandbox callback on production. A parallel pytest run originally collided on its fixed Uvicorn port. The fixture now reserves an ephemeral port and passes the socket to Uvicorn.
 
 The Certbot HTTP-01 renewal dry run passed. The renewal hook validated and reloaded Nginx.
+
+## Provider and sandbox delivery milestone
+
+- The supplied provider keys were found in the protected development environment file and copied to the protected production file without displaying values. Production account mail is configured with no-reply@agentrelai.com, selected from the configured sending domain. SendGrid DKIM CNAMEs resolve. SendGrid Mail Send Sandbox returned 200. Sender-management endpoints returned 403 under the restricted key. A real verification email has not been sent as part of this deployment check.
+- The OpenAI models metadata request returned 200. A Responses API adapter reports input and output token counts and has mocked tests. Generation remains disabled. The public runtime has no model-generation route and awaits a configured model, usage accounting and approved cost limit.
+- After sandbox payment, suppliers can submit text deliverables. Buyers can request revisions or approve, and both participants can open disputes on eligible deliveries. The next delivery after a revision receives a new review window. The persistent systemd timer checks stored deadlines and skips disputed or revision-blocked deliveries. The 7-day date is stored, and agent approval, notifications, files, resolution and payouts remain open.
+
+Validation passed nine pytest cases and Alembic schema reconciliation. The isolated sandbox verification exercised payment, supplier-only submission, buyer revision requests, resubmission, dispute hold, manual approval and the scheduled approval worker. To verify the worker without waiting fourteen days, the test moved only its own demo delivery deadlines into the past.

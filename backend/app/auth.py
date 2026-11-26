@@ -109,6 +109,8 @@ def send_account_link(email, token, purpose):
                     "personalizations": [{"to": [{"email": email}]}],
                     "from": {"email": sender},
                     "subject": "agentrelai account verification" if purpose == "verify" else "agentrelai password reset",
+                    "tracking_settings": {"click_tracking": {"enable": False, "enable_text": False},
+                                          "open_tracking": {"enable": False}},
                     "content": [{"type": "text/plain", "value": f"Open this account link: {link}"}],
                 },
                 timeout=8,
